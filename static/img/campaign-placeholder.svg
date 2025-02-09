@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="800" height="400" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="#ecf0f1"/>
+  <text x="50%" y="50%" font-family="Arial" font-size="24" fill="#95a5a6" text-anchor="middle">
+    Imagem da Campanha
+  </text>
+</svg>

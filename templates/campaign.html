@@ -1,0 +1,590 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/campaign.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/like-animation.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/emoji-picker.css') }}">
+<style>
+.campaign-header {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+}
+
+.campaign-title {
+    margin: 0;
+    font-size: 2.5rem;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.campaign-meta {
+    margin-top: 0.5rem;
+    color: #7f8c8d;
+    font-size: 0.95rem;
+}
+
+.btn-like {
+    border: 2px solid #e74c3c;
+    background: white;
+    color: #e74c3c;
+    font-size: 1.2rem;
+    padding: 0.5rem 1.2rem;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-like:hover {
+    transform: scale(1.05);
+    background: #fef2f2;
+}
+
+.btn-like.liked {
+    background: #e74c3c;
+    color: white;
+}
+
+.btn-like:not(.liked) {
+    color: #e74c3c;
+}
+
+.btn-like i {
+    transition: transform 0.3s ease;
+}
+
+.btn-like:hover i {
+    transform: scale(1.2);
+}
+
+.like-count {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.campaign-stats {
+    background: #f8f9fa;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    height: 100%;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-icon {
+    font-size: 2rem;
+    color: #3498db;
+    margin-bottom: 1rem;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.progress {
+    height: 25px;
+    border-radius: 50px;
+    background-color: #edf2f7;
+    margin: 2rem 0;
+}
+
+.progress-bar {
+    background-color: #3498db;
+    border-radius: 50px;
+    transition: width 1s ease;
+    position: relative;
+}
+
+.campaign-description {
+    background: white;
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    margin-bottom: 2rem;
+}
+
+.campaign-description h2 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+    font-size: 1.8rem;
+}
+
+.campaign-description p {
+    color: #4a5568;
+    line-height: 1.7;
+    font-size: 1.1rem;
+}
+
+.donation-section {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-radius: 15px;
+}
+
+.donation-section .card-body {
+    padding: 2rem;
+}
+
+.donation-section h5 {
+    color: #2c3e50;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.form-control {
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    font-size: 1.1rem;
+}
+
+.btn-primary {
+    padding: 0.8rem 2rem;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <!-- Campaign Details -->
+        <div class="col-md-8">
+            <!-- Campaign Header -->
+            <div class="campaign-header mb-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1 class="campaign-title">{{ campaign.title }}</h1>
+                    {% if current_user.is_authenticated %}
+                        <button class="btn btn-like {% if campaign in current_user.likes %}liked{% endif %}" 
+                                data-campaign-id="{{ campaign.id }}">
+                            <i class="fas fa-heart"></i>
+                            <span class="like-count">{{ campaign.likes|length }}</span>
+                        </button>
+                    {% endif %}
+                </div>
+                <p class="text-muted campaign-meta">
+                    Criado por {{ campaign.creator.username }} em {{ campaign.created_at.strftime('%d/%m/%Y') }}
+                </p>
+            </div>
+
+            <!-- Campaign Stats -->
+            <div class="campaign-stats row mb-4">
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <i class="fas fa-hand-holding-usd stat-icon"></i>
+                        <span class="stat-label">Arrecadado</span>
+                        <span class="stat-value">{{ campaign.current_amount|format_currency_br }}</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <i class="fas fa-bullseye stat-icon"></i>
+                        <span class="stat-label">Meta</span>
+                        <span class="stat-value">{{ campaign.goal|format_currency_br }}</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <i class="fas fa-clock stat-icon"></i>
+                        <span class="stat-label">Dias Restantes</span>
+                        <span class="stat-value">
+                            {% if campaign.days_remaining is not none %}
+                                {{ campaign.days_remaining }}
+                            {% else %}
+                                Sem prazo
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <i class="fas fa-eye stat-icon"></i>
+                        <span class="stat-label">Visualizações</span>
+                        <span class="stat-value">{{ campaign.views }}</span>
+                    </div>
+                </div>
+            </div>
+
+            {% if current_user.is_authenticated and current_user.id == campaign.user_id %}
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Gerenciamento de Retiradas</h5>
+                        <p>Valor disponível para retirada: <strong>{{ campaign.available_for_withdrawal|format_currency_br }}</strong></p>
+                        
+                        {% if campaign.withdrawals %}
+                            {% set last_withdrawal = campaign.withdrawals|first %}
+                            <div class="alert {% if last_withdrawal.status == 'pending' %}alert-warning{% elif last_withdrawal.status == 'approved' %}alert-success{% else %}alert-danger{% endif %}">
+                                <i class="fas fa-info-circle"></i>
+                                {% if last_withdrawal.status == 'pending' %}
+                                    Sua solicitação de retirada está em análise.
+                                    <small>Solicitada em {{ last_withdrawal.created_at|format_datetime }}</small>
+                                {% elif last_withdrawal.status == 'approved' %}
+                                    Sua solicitação de retirada foi aprovada.
+                                    <small>Aprovada em {{ last_withdrawal.processed_at|format_datetime }}</small>
+                                {% else %}
+                                    Sua solicitação de retirada foi rejeitada.
+                                    <small>Rejeitada em {{ last_withdrawal.processed_at|format_datetime }}</small>
+                                {% endif %}
+                            </div>
+                        {% elif campaign.available_for_withdrawal > 0 %}
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#withdrawalModal">
+                                <i class="fas fa-money-bill-wave"></i> Solicitar Retirada
+                            </button>
+
+                            <!-- Modal de Retirada -->
+                            <div class="modal fade" id="withdrawalModal" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form action="{{ url_for('request_withdrawal', campaign_id=campaign.id) }}" method="POST">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Solicitar Retirada</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="alert alert-warning">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    <strong>Atenção!</strong> 
+                                                    <ul class="mb-0">
+                                                        <li>Ao solicitar a retirada, sua campanha será automaticamente encerrada e não poderá mais receber doações.</li>
+                                                        <li>Você só pode solicitar retirada uma única vez.</li>
+                                                    </ul>
+                                                </div>
+                                                <p>Valor disponível para retirada: <strong>{{ campaign.available_for_withdrawal|format_currency_br }}</strong></p>
+                                                <p>Taxa de retirada: <strong>{{ withdrawal_fee }}%</strong></p>
+                                                <p>Valor líquido estimado: <strong>{{ (campaign.available_for_withdrawal * (1 - withdrawal_fee/100))|format_currency_br }}</strong></p>
+                                                
+                                                <div class="form-check mb-3">
+                                                    <input class="form-check-input" type="checkbox" id="confirmWithdrawal" required>
+                                                    <label class="form-check-label" for="confirmWithdrawal">
+                                                        Eu entendo que ao solicitar a retirada, minha campanha será encerrada e não poderei mais receber doações.
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-primary">Confirmar Retirada</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Não há valor disponível para retirada.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Progress Bar -->
+            <div class="progress mb-4" style="height: 25px;">
+                <div class="progress-bar" 
+                     role="progressbar" 
+                     style="width: {{ campaign.progress_percentage }}%;"
+                     aria-valuenow="{{ campaign.progress_percentage }}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="100">
+                    {{ "%.1f"|format(campaign.progress_percentage) }}%
+                </div>
+            </div>
+
+            <!-- Campaign Image -->
+            <div class="campaign-image-container">
+                {% if campaign.image %}
+                    <img src="{{ url_for('static', filename='uploads/' + campaign.image) }}" alt="{{ campaign.title }}" class="img-fluid rounded">
+                {% else %}
+                    <img src="{{ url_for('static', filename='img/default_campaign.jpg') }}" alt="Imagem padrão" class="img-fluid rounded">
+                {% endif %}
+
+                {% if current_user.is_authenticated and (current_user.id == campaign.user_id or current_user.is_admin) %}
+                    <div class="image-upload-overlay">
+                        <form action="{{ url_for('update_campaign_image', campaign_id=campaign.id) }}" method="post" enctype="multipart/form-data" id="imageForm">
+                            <label for="image" class="btn btn-light">
+                                <i class="fas fa-camera"></i> Alterar Imagem
+                            </label>
+                            <input type="file" name="image" id="image" accept="image/*" style="display: none;" onchange="this.form.submit()">
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="campaign-description mt-4">
+                <h2>Sobre a Campanha</h2>
+                <p>{{ campaign.description }}</p>
+            </div>
+
+            <!-- Donation Form -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Doar para esta campanha</h5>
+                    
+                    {% set pending_withdrawal = campaign.withdrawals|selectattr('status', 'equalto', 'pending')|first %}
+                    
+                    {% if pending_withdrawal %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-lock"></i>
+                            <strong>Doações bloqueadas:</strong> O criador da campanha solicitou a retirada do valor total. Não é mais possível fazer doações para esta campanha.
+                        </div>
+                    {% elif campaign.end_date and campaign.end_date < now %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-clock"></i>
+                            Esta campanha já foi encerrada.
+                        </div>
+                    {% else %}
+                        {% if current_user.is_authenticated %}
+                            <form id="donationForm" action="{{ url_for('donate', campaign_id=campaign.id) }}" method="POST" onsubmit="return confirmDonation(event)" class="donation-form">
+                                <div class="mb-3">
+                                    <label for="amount" class="form-label">Valor da doação (R$)</label>
+                                    <input type="text" 
+                                        class="form-control currency-input" 
+                                        id="amount" 
+                                        name="amount" 
+                                        required 
+                                        placeholder="0,00"
+                                        pattern="[0-9]*[,.]?[0-9]+"
+                                        inputmode="decimal">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="message" class="form-label">Mensagem (opcional)</label>
+                                    <textarea class="form-control" id="message" name="message" rows="3"></textarea>
+                                </div>
+                                <div class="mb-3 form-check">
+                                    <input type="checkbox" class="form-check-input" id="anonymous" name="anonymous">
+                                    <label class="form-check-label" for="anonymous">Fazer doação anônima</label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-heart"></i>
+                                    Doar Agora
+                                </button>
+                            </form>
+
+                            <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                // Formatação do input de valor
+                                const currencyInputs = document.querySelectorAll('.currency-input');
+                                currencyInputs.forEach(function(input) {
+                                    input.addEventListener('input', function(e) {
+                                        let value = e.target.value.replace(/\D/g, '');
+                                        value = (parseInt(value) / 100).toFixed(2);
+                                        e.target.value = value.replace('.', ',');
+                                    });
+                                });
+                            });
+
+                            function confirmDonation(event) {
+                                event.preventDefault();
+                                const amountInput = document.getElementById('amount');
+                                const amount = amountInput.value.replace(',', '.');
+                                
+                                if (isNaN(amount) || amount <= 0) {
+                                    alert('Por favor, insira um valor válido para a doação.');
+                                    return false;
+                                }
+
+                                const formattedAmount = parseFloat(amount).toLocaleString('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL'
+                                });
+
+                                if (confirm(`Confirma a doação de ${formattedAmount}?`)) {
+                                    event.target.submit();
+                                }
+                                return false;
+                            }
+                            </script>
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                Para fazer uma doação, por favor <a href="{{ url_for('login') }}">faça login</a> ou 
+                                <a href="{{ url_for('register') }}">crie uma conta</a>.
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Comments Section -->
+            {% if campaign.allow_comments %}
+                <div class="comments-section mt-5">
+                    <h3>Comentários</h3>
+                    
+                    {% if current_user.is_authenticated %}
+                        <form action="{{ url_for('add_comment', campaign_id=campaign.id) }}" method="post" class="mb-4">
+                            <div class="form-group">
+                                <textarea class="form-control" name="content" rows="3" placeholder="Escreva seu comentário..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary mt-2">Comentar</button>
+                        </form>
+                    {% endif %}
+
+                    <div class="comments-list">
+                        {% for comment in campaign.comments|sort(attribute='created_at', reverse=true) %}
+                            <div class="comment">
+                                <div class="comment-header">
+                                    <strong>{{ comment.author.username }}</strong>
+                                    <small class="text-muted">{{ comment.created_at|format_datetime }}</small>
+                                </div>
+                                <div class="comment-content">
+                                    {{ comment.content }}
+                                </div>
+                            </div>
+                        {% else %}
+                            <p class="text-muted">Nenhum comentário ainda. Seja o primeiro a comentar!</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Share Section -->
+            <div class="share-section card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Compartilhe</h5>
+                    <div class="social-buttons">
+                        <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url }}" target="_blank" class="btn btn-facebook">
+                            <i class="fab fa-facebook-f"></i>
+                        </a>
+                        <a href="https://twitter.com/intent/tweet?url={{ request.url }}&text={{ campaign.title }}" target="_blank" class="btn btn-twitter">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="https://wa.me/?text={{ campaign.title }}%20{{ request.url }}" target="_blank" class="btn btn-whatsapp">
+                            <i class="fab fa-whatsapp"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Donations -->
+            <div class="recent-donations card">
+                <div class="card-body">
+                    <h5 class="card-title">Últimas Doações</h5>
+                    <div class="donations-list">
+                        {% set sorted_donations = campaign.donations|sort(attribute='created_at', reverse=true) %}
+                        {% for donation in sorted_donations %}
+                            {% if loop.index <= 5 %}
+                            <div class="donation-item">
+                                <div class="donation-info">
+                                    <strong>{{ donation.donor.username }}</strong> doou
+                                    <span class="donation-amount">{{ donation.amount|format_currency_br }}</span>
+                                </div>
+                                <small class="text-muted">{{ donation.created_at|format_datetime }}</small>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <p class="text-muted">Nenhuma doação ainda. Seja o primeiro a doar!</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+$(document).ready(function() {
+    // Like functionality
+    $('.btn-like').click(function(e) {
+        e.preventDefault();
+        var button = $(this);
+        var campaignId = button.data('campaign-id');
+        
+        $.ajax({
+            url: '/campaign/' + campaignId + '/like',
+            type: 'POST',
+            success: function(response) {
+                if (response.liked) {
+                    button.addClass('liked');
+                } else {
+                    button.removeClass('liked');
+                }
+                button.find('.like-count').text(response.count);
+            },
+            error: function(xhr, status, error) {
+                if (xhr.status === 401) {
+                    // Usuário não está logado
+                    window.location.href = '/login?next=' + window.location.pathname;
+                } else {
+                    alert('Erro ao processar like. Por favor, tente novamente.');
+                }
+            }
+        });
+    });
+
+    // Currency input formatting
+    $('.currency-input').on('input', function() {
+        var value = $(this).val().replace(/\D/g, '');
+        if (value === '') {
+            $(this).val('');
+            return;
+        }
+        value = (value/100).toFixed(2);
+        value = value.replace('.', ',');
+        $(this).val(value);
+    });
+});
+
+function confirmDonation(event) {
+    event.preventDefault();
+    
+    var amountInput = document.getElementById('amount');
+    var value = amountInput.value;
+    
+    // Converte para float (troca vírgula por ponto)
+    var numericValue = parseFloat(value.replace(',', '.'));
+    
+    if (isNaN(numericValue) || numericValue <= 0) {
+        alert('Por favor, insira um valor válido maior que zero.');
+        return false;
+    }
+    
+    // Confirmar com o usuário
+    if (confirm(`Confirma a doação de R$ ${value}?`)) {
+        // Enviar o formulário
+        document.getElementById('donationForm').submit();
+    }
+    
+    return false;
+}
+</script>
+{% endblock %}

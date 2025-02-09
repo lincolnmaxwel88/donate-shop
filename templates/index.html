@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<head>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+</head>
+<body>
+    <!-- Hero Section -->
+    <div class="hero-section text-center">
+        <div class="container">
+            <h1 class="display-4">Faça a Diferença Hoje</h1>
+            <p class="lead">Junte-se a nossa comunidade de doadores e ajude a transformar vidas</p>
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('new_campaign') }}" class="btn btn-light btn-lg">Criar Campanha</a>
+            {% else %}
+                <a href="{{ url_for('register') }}" class="btn btn-light btn-lg">Começar a Doar</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="container mb-5">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="stats-box">
+                    <h3>{{ campaigns|length }}</h3>
+                    <p>Campanhas Ativas</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stats-box">
+                    <h3 > {{ campaigns|sum(attribute='current_amount')|format_currency_br }}</h3>
+                    <p>Doações Realizadas</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stats-box">
+                    <h3>{{ campaigns|sum(attribute='views') }}</h3>
+                    <p>Visualizações</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaigns Section -->
+    <div class="container">
+        <h2 class="text-center mb-4">Campanhas em Destaque</h2>
+        <div class="row">
+            {% for campaign in campaigns %}
+            <div class="col-md-4">
+                <div class="card campaign-card fade-in">
+                    <div class="campaign-image">
+                        {% if campaign.image %}
+                        <img src="{{ url_for('static', filename='uploads/' + campaign.image) }}" alt="{{ campaign.title }}" class="img-fluid">
+                        {% else %}
+                        <img src="{{ url_for('static', filename='img/default_campaign.svg') }}" alt="Imagem padrão" class="img-fluid">
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ campaign.title }}</h5>
+                        <p class="card-text">{{ campaign.description[:100] }}...</p>
+                        <div class="progress mb-3">
+                            {% set percentage = (campaign.current_amount / campaign.goal * 100)|round|int if campaign.goal > 0 else 0 %}
+                            <div class="progress-bar" role="progressbar" style="width: {{ percentage }}%"
+                                aria-valuenow="{{ percentage }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ "%.1f"|format(percentage) }}%
+                            </div>
+                        </div>
+                        <p class="text-muted">
+                            <small>Meta: {{ campaign.goal|format_currency_br }}</small>
+                            <br>
+                            <small>Arrecadado: {{ campaign.current_amount|format_currency_br }}</small>
+                        </p>
+                        <a href="{{ url_for('campaign', campaign_id=campaign.id) }}" class="btn btn-primary btn-block">Ver Mais</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}

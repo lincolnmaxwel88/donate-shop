@@ -1,0 +1,137 @@
+body {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: none;
+}
+
+.progress {
+    height: 25px;
+    border-radius: 12px;
+    position: relative;
+    background-color: #e9ecef;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background-color: #0d6efd;
+    transition: width 0.6s ease;
+    min-width: 2em; /* Garante um espaço mínimo para números pequenos */
+}
+
+.progress-text {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: #000;
+    font-weight: 500;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.7);
+    z-index: 1;
+    width: 100%;
+    text-align: center;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.nav-link.btn {
+    padding: 0.5rem 1.2rem;
+    margin: 0 0.5rem;
+    border-radius: 20px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.nav-link.btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+.nav-link.btn-primary:hover {
+    background-color: #0b5ed7;
+    border-color: #0b5ed7;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.nav-link.btn-outline-primary {
+    border: 2px solid #0d6efd;
+    color: #0d6efd;
+    background-color: transparent;
+}
+
+.nav-link.btn-outline-primary:hover {
+    background-color: #0d6efd;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+    padding: 10px 20px;
+    font-weight: 500;
+}
+
+.card-title {
+    color: #333;
+    font-weight: 600;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}
+
+.footer {
+    background-color: #f8f9fa;
+    padding: 1.5rem 0;
+    margin-top: 3rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.footer p {
+    margin-bottom: 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+main {
+    flex: 1;
+}
+
+.campaign-image {
+    height: 200px;
+    overflow: hidden;
+    background-color: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.campaign-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.campaign-image img[src*="default_campaign.svg"] {
+    object-fit: contain;
+    padding: 20px;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 0 15px;
+    }
+    
+    .card {
+        margin-bottom: 20px;
+    }
+}

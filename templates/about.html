@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <!-- Hero Section -->
+    <div class="row mb-5">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-3">Quem Somos</h1>
+            <div class="d-flex justify-content-center mb-4">
+                <div class="border-bottom border-primary" style="width: 100px;"></div>
+            </div>
+            <p class="lead text-muted">
+                Transformando sonhos em realidade através da força da colaboração
+            </p>
+        </div>
+    </div>
+
+    <!-- Missão Section -->
+    <div class="row align-items-center mb-5">
+        <div class="col-md-6">
+            <div class="p-4 bg-primary bg-opacity-10 rounded-3 h-100">
+                <h2 class="text-primary mb-4">Nossa Missão</h2>
+                <p class="lead mb-0">
+                    Somos uma plataforma dedicada a transformar sonhos em realidade através do poder 
+                    da colaboração e da generosidade humana. Acreditamos que juntos podemos criar 
+                    um impacto positivo na vida das pessoas.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="p-4 text-center">
+                <i class="fas fa-rocket text-primary" style="font-size: 5rem;"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- História Section -->
+    <div class="row align-items-center mb-5">
+        <div class="col-md-6 order-md-2">
+            <div class="p-4 bg-warning bg-opacity-10 rounded-3 h-100">
+                <h2 class="text-warning mb-4">Nossa História</h2>
+                <p class="mb-0">
+                    Nascemos da crença de que cada pessoa merece a oportunidade de realizar seus sonhos, 
+                    independentemente de sua situação financeira. Nossa plataforma foi criada para ser 
+                    uma ponte entre aqueles que têm sonhos e projetos inspiradores e pessoas dispostas 
+                    a contribuir para torná-los realidade.
+                </p>
+            </div>
+        </div>
+        <div class="col-md-6 order-md-1">
+            <div class="p-4 text-center">
+                <i class="fas fa-book-open text-warning" style="font-size: 5rem;"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Valores Section -->
+    <div class="row mb-5">
+        <div class="col-12 text-center mb-4">
+            <h2 class="text-success">Nossos Valores</h2>
+            <div class="d-flex justify-content-center mb-4">
+                <div class="border-bottom border-success" style="width: 80px;"></div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card h-100 border-0 shadow-sm hover-card">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-check-circle text-success" style="font-size: 2.5rem;"></i>
+                    </div>
+                    <h5 class="card-title">Transparência</h5>
+                    <p class="card-text">Garantimos total transparência em todas as doações e campanhas.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card h-100 border-0 shadow-sm hover-card">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-shield-alt text-primary" style="font-size: 2.5rem;"></i>
+                    </div>
+                    <h5 class="card-title">Segurança</h5>
+                    <p class="card-text">Sua segurança e privacidade são nossas prioridades.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card h-100 border-0 shadow-sm hover-card">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-hands-helping text-warning" style="font-size: 2.5rem;"></i>
+                    </div>
+                    <h5 class="card-title">Solidariedade</h5>
+                    <p class="card-text">Acreditamos no poder da ajuda mútua e da colaboração.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card h-100 border-0 shadow-sm hover-card">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-star text-danger" style="font-size: 2.5rem;"></i>
+                    </div>
+                    <h5 class="card-title">Excelência</h5>
+                    <p class="card-text">Buscamos sempre a melhor experiência para nossos usuários.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compromisso Section -->
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <div class="p-5 bg-light rounded-3 text-center">
+                <h2 class="text-dark mb-4">Nosso Compromisso</h2>
+                <p class="lead mb-4">
+                    Estamos comprometidos em ser mais do que uma plataforma de doações. Somos um espaço 
+                    onde sonhos ganham asas, onde a comunidade se une para apoiar iniciativas inspiradoras, 
+                    e onde cada contribuição, por menor que seja, tem o poder de transformar vidas.
+                </p>
+                <p class="h5 text-primary">
+                    Junte-se a nós nessa jornada de transformação e seja parte de histórias incríveis 
+                    de superação e realização.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-card {
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+}
+
+.bg-opacity-10 {
+    --bs-bg-opacity: 0.1;
+}
+
+.border-bottom {
+    height: 3px;
+    border-radius: 2px;
+}
+
+.display-4 {
+    font-weight: 600;
+}
+
+.lead {
+    line-height: 1.8;
+}
+
+@media (max-width: 768px) {
+    .order-md-1 {
+        order: 1;
+    }
+    .order-md-2 {
+        order: 2;
+    }
+}
+</style>
+{% endblock %}

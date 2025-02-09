@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h1 class="text-center mb-4">
+                        <i class="fas fa-user-shield text-primary me-2"></i>
+                        Painel Administrativo
+                    </h1>
+
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-users text-primary mb-3" style="font-size: 2rem;"></i>
+                                    <h5 class="card-title">Total de Usuários</h5>
+                                    <p class="h2 mb-0">{{ total_users }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-bullhorn text-success mb-3" style="font-size: 2rem;"></i>
+                                    <h5 class="card-title">Total de Campanhas</h5>
+                                    <p class="h2 mb-0">{{ total_campaigns }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-hand-holding-heart text-danger mb-3" style="font-size: 2rem;"></i>
+                                    <h5 class="card-title">Total de Doações</h5>
+                                    <p class="h2 mb-0">{{ total_donations }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botão Limpar Banco -->
+                    <div class="text-end mt-4">
+                        <form action="{{ url_for('clear_database') }}" method="POST" class="d-inline" onsubmit="return confirm('ATENÇÃO! Esta ação irá:\n\n1. Manter apenas o usuário admin\n2. Excluir todas as campanhas\n3. Excluir todos os outros usuários\n4. Excluir todas as doações\n\nTem certeza que deseja continuar?');">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Limpar Banco de Dados
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h4 class="mb-3">Gerenciamento de Usuários</h4>
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Usuário</th>
+                                            <th>Email</th>
+                                            <th>Campanhas</th>
+                                            <th>Doações</th>
+                                            <th>Admin</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for user in users %}
+                                        <tr>
+                                            <td>{{ user.username }}</td>
+                                            <td>{{ user.email }}</td>
+                                            <td>{{ user.campaigns|length }}</td>
+                                            <td>{{ user.donations|length }}</td>
+                                            <td>
+                                                <span class="badge {% if user.is_admin %}bg-success{% else %}bg-secondary{% endif %}">
+                                                    {% if user.is_admin %}Sim{% else %}Não{% endif %}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge {% if user.is_blocked %}bg-danger{% else %}bg-success{% endif %}">
+                                                    {% if user.is_blocked %}Bloqueado{% else %}Ativo{% endif %}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if not user.is_admin or current_user.id != user.id %}
+                                                <div class="btn-group" role="group">
+                                                    <button type="button" 
+                                                            class="btn btn-sm {% if user.is_admin %}btn-danger{% else %}btn-success{% endif %}"
+                                                            onclick="toggleAdmin('{{ user.id }}', '{{ user.username }}')">
+                                                        {% if user.is_admin %}
+                                                            <i class="fas fa-user-minus"></i> Remover Admin
+                                                        {% else %}
+                                                            <i class="fas fa-user-shield"></i> Tornar Admin
+                                                        {% endif %}
+                                                    </button>
+                                                    <button type="button" 
+                                                            class="btn btn-sm {% if user.is_blocked %}btn-success{% else %}btn-danger{% endif %}"
+                                                            onclick="toggleBlock('{{ user.id }}', '{{ user.username }}')">
+                                                        {% if user.is_blocked %}
+                                                            <i class="fas fa-unlock"></i> Desbloquear
+                                                        {% else %}
+                                                            <i class="fas fa-lock"></i> Bloquear
+                                                        {% endif %}
+                                                    </button>
+                                                </div>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <h4 class="mb-3">Últimas Campanhas</h4>
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Título</th>
+                                            <th>Criador</th>
+                                            <th>Meta</th>
+                                            <th>Arrecadado</th>
+                                            <th>Progresso</th>
+                                            <th>Data</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for campaign in recent_campaigns %}
+                                        <tr>
+                                            <td>
+                                                <a href="{{ url_for('campaign', campaign_id=campaign.id) }}" class="text-decoration-none">
+                                                    {{ campaign.title }}
+                                                </a>
+                                            </td>
+                                            <td>{{ campaign.creator.username }}</td>
+                                            <td>{{ campaign.goal|format_currency_br }}</td>
+                                            <td>{{ campaign.current_amount|format_currency_br }}</td>
+                                            <td>
+                                                <div class="progress" style="height: 20px;">
+                                                    <div class="progress-bar bg-success" 
+                                                         role="progressbar" 
+                                                         style="width: {{ campaign.progress_percentage }}%" 
+                                                         aria-valuenow="{{ campaign.progress_percentage }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100">
+                                                        {{ campaign.progress_percentage }}%
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>{{ campaign.created_at|format_datetime }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleAdmin(userId, username) {
+    if (confirm(`Deseja alterar o status de administrador do usuário ${username}?`)) {
+        fetch(`/admin/toggle_admin/${userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || 'Erro ao alterar status de administrador');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Erro ao alterar status de administrador');
+        });
+    }
+}
+
+function toggleBlock(userId, username) {
+    if (confirm(`Deseja alterar o status de bloqueio do usuário ${username}?`)) {
+        fetch(`/admin/toggle_block/${userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || 'Erro ao alterar status de bloqueio');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Erro ao alterar status de bloqueio');
+        });
+    }
+}
+</script>
+{% endblock %}

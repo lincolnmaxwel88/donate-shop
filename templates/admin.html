@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Painel Administrativo</h2>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3>Campanhas</h3>
+                    <form action="{{ url_for('clear_database') }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-danger"
+                                onclick="return confirm('ATENÇÃO: Isso irá excluir todas as campanhas e usuários (exceto você). Esta ação não pode ser desfeita. Deseja continuar?')">
+                            <i class="fas fa-trash-alt"></i> Limpar Banco de Dados
+                        </button>
+                    </form>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Título</th>
+                                    <th>Criador</th>
+                                    <th>Meta</th>
+                                    <th>Arrecadado</th>
+                                    <th>Visualizações</th>
+                                    <th>Curtidas</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for campaign in campaigns %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('campaign', campaign_id=campaign.id) }}">
+                                            {{ campaign.title }}
+                                        </a>
+                                    </td>
+                                    <td>{{ campaign.creator.username }}</td>
+                                    <td>{{ campaign.goal|format_currency_br }}</td>
+                                    <td>{{ campaign.current_amount|format_currency_br }}</td>
+                                    <td>{{ campaign.views }}</td>
+                                    <td>{{ campaign.likes|length }}</td>
+                                    <td>
+                                        <form action="{{ url_for('delete_campaign', campaign_id=campaign.id) }}" 
+                                              method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('Tem certeza que deseja excluir esta campanha?')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Usuários</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Admin</th>
+                                    <th>Campanhas</th>
+                                    <th>Doações</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        {% if user.is_admin %}
+                                            <span class="badge bg-success">Sim</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Não</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.campaigns|length }}</td>
+                                    <td>{{ user.donations|length }}</td>
+                                    <td>
+                                        {% if user.id != current_user.id %}
+                                        <form action="{{ url_for('toggle_admin', user_id=user.id) }}" 
+                                              method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-warning btn-sm">
+                                                <i class="fas fa-user-shield"></i>
+                                            </button>
+                                        </form>
+                                        <form action="{{ url_for('delete_user', user_id=user.id) }}" 
+                                              method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-danger btn-sm"
+                                                    onclick="return confirm('Tem certeza que deseja excluir este usuário? Todas as campanhas e doações associadas também serão excluídas.')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

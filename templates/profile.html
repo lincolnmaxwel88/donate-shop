@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h1 class="text-center mb-4">Perfil do Usuário</h1>
+                    
+                    <div class="text-center mb-4">
+                        <div class="profile-photo-container">
+                            {% if current_user.profile_image %}
+                                <img src="{{ url_for('static', filename='uploads/' + current_user.profile_image) }}" 
+                                     class="profile-photo" 
+                                     alt="Foto de perfil">
+                            {% else %}
+                                <i class="fas fa-user-circle text-primary profile-icon"></i>
+                            {% endif %}
+                            <div class="photo-upload-overlay">
+                                <form action="{{ url_for('update_profile_photo') }}" 
+                                      method="POST" 
+                                      enctype="multipart/form-data" 
+                                      id="photoForm">
+                                    <label for="photoInput" class="upload-label">
+                                        <i class="fas fa-camera"></i>
+                                        <span>Alterar foto</span>
+                                    </label>
+                                    <input type="file" 
+                                           id="photoInput" 
+                                           name="photo" 
+                                           accept="image/*" 
+                                           class="d-none"
+                                           onchange="document.getElementById('photoForm').submit()">
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-8 offset-md-2">
+                            <div class="card-text text-center">
+                                <h4>{{ current_user.username }}</h4>
+                                <p class="text-muted">{{ current_user.email }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <a href="{{ url_for('my_campaigns') }}" class="text-decoration-none">
+                                <div class="profile-stat">
+                                    <i class="fas fa-bullhorn text-primary"></i>
+                                    <h5>Campanhas Criadas</h5>
+                                    <p class="text-muted mb-0">
+                                        <span class="h4 text-primary">{{ current_user.campaigns|length }}</span>
+                                        campanhas
+                                    </p>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="{{ url_for('my_donations') }}" class="text-decoration-none">
+                                <div class="profile-stat">
+                                    <i class="fas fa-hand-holding-heart text-success"></i>
+                                    <h5>Doações Realizadas</h5>
+                                    <p class="text-muted mb-0">
+                                        <span class="h4 text-success">{{ current_user.donations|length }}</span>
+                                        doações
+                                    </p>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="{{ url_for('user_likes') }}" class="text-decoration-none">
+                                <div class="profile-stat">
+                                    <i class="fas fa-heart text-danger"></i>
+                                    <h5>Campanhas Curtidas</h5>
+                                    <p class="text-muted mb-0">
+                                        <span class="h4 text-danger">{{ total_likes }}</span>
+                                        curtidas
+                                    </p>
+
+                        
+                                    </span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <a href="{{ url_for('new_campaign') }}" class="btn btn-primary">
+                            <i class="fas fa-plus-circle me-2"></i>Criar Nova Campanha
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.profile-stat {
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+}
+
+.profile-stat:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.profile-stat i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.profile-stat h5 {
+    margin-bottom: 15px;
+    color: #495057;
+}
+
+.profile-photo-container {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    margin: 0 auto;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+.profile-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-icon {
+    font-size: 150px;
+    line-height: 150px;
+}
+
+.photo-upload-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.profile-photo-container:hover .photo-upload-overlay {
+    opacity: 1;
+}
+
+.upload-label {
+    color: white;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.9rem;
+}
+
+.upload-label i {
+    font-size: 1.2rem;
+}
+
+.hover-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+}
+
+.card-title {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.card-title i {
+    margin-right: 0.5rem;
+}
+</style>
+{% endblock %}

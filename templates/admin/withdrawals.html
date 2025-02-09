@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerenciar Retiradas{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Gerenciar Solicitações de Retirada</h2>
+    
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Campanha</th>
+                    <th>Solicitante</th>
+                    <th>Valor Bruto</th>
+                    <th>Taxa (%)</th>
+                    <th>Valor Líquido</th>
+                    <th>Status</th>
+                    <th>Data Solicitação</th>
+                    <th>Processado em</th>
+                    <th>Processado por</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for withdrawal in withdrawals %}
+                <tr>
+                    <td>{{ withdrawal.id }}</td>
+                    <td>{{ withdrawal.campaign.title }}</td>
+                    <td>{{ withdrawal.requester.username }}</td>
+                    <td>{{ withdrawal.amount|format_currency_br }}</td>
+                    <td>{{ withdrawal.fee_percentage }}%</td>
+                    <td>{{ withdrawal.net_amount|format_currency_br }}</td>
+                    <td>
+                        {% if withdrawal.status == 'pending' %}
+                            <span class="badge bg-warning">Pendente</span>
+                        {% elif withdrawal.status == 'approved' %}
+                            <span class="badge bg-success">Aprovado</span>
+                        {% else %}
+                            <span class="badge bg-danger">Rejeitado</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ withdrawal.created_at|format_datetime }}</td>
+                    <td>{{ withdrawal.processed_at|format_datetime }}</td>
+                    <td>{{ withdrawal.processor.username if withdrawal.processor else '' }}</td>
+                    <td>
+                        {% if withdrawal.status == 'pending' %}
+                        <div class="btn-group" role="group">
+                            <form action="{{ url_for('approve_withdrawal', withdrawal_id=withdrawal.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Tem certeza que deseja aprovar esta retirada?')">
+                                    <i class="fas fa-check"></i> Aprovar
+                                </button>
+                            </form>
+                            <form action="{{ url_for('reject_withdrawal', withdrawal_id=withdrawal.id) }}" method="POST" class="d-inline ms-1">
+                                <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Tem certeza que deseja rejeitar esta retirada?')">
+                                    <i class="fas fa-times"></i> Rejeitar
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

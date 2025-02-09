@@ -1,0 +1,53 @@
+.btn-like {
+    border: none;
+    background: transparent;
+    padding: 0.375rem 0.75rem;
+    transition: transform 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    color: #6c757d;
+}
+
+.btn-like:hover:not(:disabled) {
+    transform: scale(1.1);
+    color: #dc3545;
+}
+
+.btn-like:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.btn-like .fa-heart {
+    font-size: 1.25rem;
+    margin-right: 0.25rem;
+}
+
+.btn-like .far.fa-heart {
+    color: #6c757d;
+}
+
+.btn-like .fas.fa-heart {
+    color: #dc3545;
+}
+
+.btn-like:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.liked-animation {
+    animation: likeEffect 0.3s ease;
+}
+
+@keyframes likeEffect {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}

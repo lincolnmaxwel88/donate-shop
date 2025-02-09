@@ -1,0 +1,80 @@
+/* Animações para o botão de curtir */
+.btn-like {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.btn-like i {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Animação de curtir */
+@keyframes heartBeat {
+    0% { transform: scale(1); }
+    25% { transform: scale(1.3); }
+    50% { transform: scale(1); }
+    75% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+@keyframes heartPop {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.4); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Animação de descurtir */
+@keyframes heartBreak {
+    0% { transform: scale(1); opacity: 1; }
+    25% { transform: scale(1.1) rotate(5deg); opacity: 0.8; }
+    50% { transform: scale(0.9) rotate(-5deg); opacity: 0.6; }
+    75% { transform: scale(0.8) rotate(5deg); opacity: 0.3; }
+    100% { transform: scale(0) rotate(0deg); opacity: 0; }
+}
+
+/* Partículas de coração */
+.heart-particle {
+    position: absolute;
+    pointer-events: none;
+    animation: particleFly 1s ease-out forwards;
+    opacity: 0;
+    font-size: 1.2em;
+}
+
+@keyframes particleFly {
+    0% {
+        transform: translate(0, 0) scale(0);
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        transform: translate(var(--tx), var(--ty)) scale(1);
+        opacity: 0;
+    }
+}
+
+/* Classes para aplicar as animações */
+.heart-beat {
+    animation: heartBeat 0.8s ease-in-out;
+}
+
+.heart-pop {
+    animation: heartPop 0.5s ease-out;
+}
+
+.heart-break {
+    animation: heartBreak 0.5s ease-out;
+}
+
+/* Estilo quando curtido */
+.btn-like.liked {
+    color: #e74c3c !important;
+    border-color: #e74c3c !important;
+}
+
+.btn-like.liked:hover {
+    background-color: rgba(231, 76, 60, 0.1);
+}

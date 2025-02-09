@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Painel Administrativo</h1>
+
+    <div class="row">
+        <!-- Estatísticas -->
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Estatísticas Gerais</h5>
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="p-3">
+                                <h4>{{ total_users }}</h4>
+                                <p class="text-muted">Usuários</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3">
+                                <h4>{{ total_campaigns }}</h4>
+                                <p class="text-muted">Campanhas</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3">
+                                <h4>{{ total_donations }}</h4>
+                                <p class="text-muted">Doações</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3">
+                                <h4>{{ total_amount|format_currency_br }}</h4>
+                                <p class="text-muted">Total Arrecadado</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gerenciamento de Usuários -->
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Gerenciamento de Usuários</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Usuário</th>
+                                    <th>Email</th>
+                                    <th>Admin</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.id }}</td>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('toggle_admin', user_id=user.id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm {% if user.is_admin %}btn-success{% else %}btn-secondary{% endif %}">
+                                                {% if user.is_admin %}
+                                                    <i class="fas fa-check"></i> Admin
+                                                {% else %}
+                                                    <i class="fas fa-times"></i> Normal
+                                                {% endif %}
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" class="d-inline" 
+                                              onsubmit="return confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.');">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i> Excluir
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gerenciamento de Campanhas -->
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Gerenciamento de Campanhas</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Título</th>
+                                    <th>Criador</th>
+                                    <th>Meta</th>
+                                    <th>Arrecadado</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for campaign in campaigns %}
+                                <tr>
+                                    <td>{{ campaign.id }}</td>
+                                    <td>{{ campaign.title }}</td>
+                                    <td>{{ campaign.creator.username }}</td>
+                                    <td>{{ campaign.goal|format_currency_br }}</td>
+                                    <td>{{ campaign.current_amount|format_currency_br }}</td>
+                                    <td>
+                                        <a href="{{ url_for('campaign', id=campaign.id) }}" class="btn btn-info btn-sm">
+                                            <i class="fas fa-eye"></i> Ver
+                                        </a>
+                                        <a href="{{ url_for('donation_history', campaign_id=campaign.id) }}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-history"></i> Histórico
+                                        </a>
+                                        <form method="POST" action="{{ url_for('delete_campaign', campaign_id=campaign.id) }}" class="d-inline"
+                                              onsubmit="return confirm('Tem certeza que deseja excluir esta campanha? Esta ação não pode ser desfeita.');">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-trash"></i> Excluir
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ações de Manutenção -->
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Ações de Manutenção</h5>
+                    <div class="d-flex gap-2">
+                        <form method="POST" action="{{ url_for('clear_database') }}" class="d-inline"
+                              onsubmit="return confirm('ATENÇÃO! Esta ação irá:\n\n1. Manter apenas o usuário admin\n2. Excluir todas as campanhas\n3. Excluir todos os outros usuários\n4. Excluir todas as doações\n\nTem certeza que deseja continuar?');">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Limpar Banco de Dados
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

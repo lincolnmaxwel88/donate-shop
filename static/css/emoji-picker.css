@@ -1,0 +1,43 @@
+.emoji-picker {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.emoji-btn {
+    font-size: 1.25rem;
+    min-width: 48px;
+    height: 48px;
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    background-color: white;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.emoji-btn:hover {
+    transform: scale(1.1);
+    background-color: #f8f9fa;
+    border-color: #ced4da;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    z-index: 1;
+}
+
+.emoji-btn:active {
+    transform: scale(0.95);
+}
+
+.gap-2 {
+    gap: 0.5rem !important;
+}
+
+/* Responsividade */
+@media (max-width: 576px) {
+    .emoji-btn {
+        font-size: 1rem;
+        min-width: 40px;
+        height: 40px;
+    }
+}

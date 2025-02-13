@@ -15,7 +15,6 @@ from flask_mail import Mail, Message
 from config import Config
 from sqlalchemy import text
 from sqlalchemy import func
-import cloudinary
 
 # Configuração do Stripe
 stripe.api_key = 'sk_test_51QbVcLKxtlwVKoGi0AuzhFm6FmgCDnwZPmMZMCKYuBmex3wb4N9yIcOTubCJb9GGpF37zBnX1YZqeo7fd68GGyHX00j2yH2KeX'

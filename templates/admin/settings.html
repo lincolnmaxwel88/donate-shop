@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Configurações do Sistema</h2>
+    
+    <div class="card mt-4">
+        <div class="card-body">
+            <form method="POST">
+                <h5 class="mb-3">Taxas do Gateway de Pagamento</h5>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label for="gateway_fee_percentage" class="form-label">Taxa Percentual do Gateway (%)</label>
+                        <div class="input-group">
+                            <input type="number" step="0.01" min="0" max="100" class="form-control" 
+                                   id="gateway_fee_percentage" name="gateway_fee_percentage" 
+                                   value="{{ '%.2f'|format(config.gateway_fee_percentage) }}" required>
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <small class="text-muted">Ex: 3.99 para uma taxa de 3,99%</small>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="gateway_fee_fixed" class="form-label">Taxa Fixa do Gateway (R$)</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" step="0.01" min="0" class="form-control" 
+                                   id="gateway_fee_fixed" name="gateway_fee_fixed" 
+                                   value="{{ '%.2f'|format(config.gateway_fee_fixed) }}" required>
+                        </div>
+                        <small class="text-muted">Ex: 0.39 para uma taxa fixa de R$ 0,39</small>
+                    </div>
+                </div>
+
+                <h5 class="mb-3">Taxas de Retirada</h5>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label for="withdrawal_fee" class="form-label">Taxa de Retirada (%)</label>
+                        <div class="input-group">
+                            <input type="number" step="0.01" min="0" max="100" class="form-control" 
+                                   id="withdrawal_fee" name="withdrawal_fee" 
+                                   value="{{ '%.2f'|format(config.withdrawal_fee) }}" required>
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <small class="text-muted">Taxa aplicada sobre o valor líquido (após taxas do gateway)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="min_withdrawal_percentage" class="form-label">Porcentagem Mínima para Retirada (%)</label>
+                        <div class="input-group">
+                            <input type="number" step="0.01" min="0" max="100" class="form-control" 
+                                    id="min_withdrawal_percentage" name="min_withdrawal_percentage" 
+                                    value="{{ '%.2f'|format(config.min_withdrawal_percentage) }}" required>
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <div class="form-text">Porcentagem mínima do total arrecadado necessária para solicitar uma retirada</div>
+                    </div>
+                </div>
+                
+                <h5 class="mb-3">Tempo de Espera para Nova Retirada</h5>
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <label for="days" class="form-label">Dias</label>
+                        <input type="number" min="0" class="form-control" id="days" name="days" 
+                               value="{{ (config.next_withdrawal_minutes // 1440)|int }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="hours" class="form-label">Horas</label>
+                        <input type="number" min="0" max="23" class="form-control" id="hours" name="hours" 
+                               value="{{ ((config.next_withdrawal_minutes % 1440) // 60)|int }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="minutes" class="form-label">Minutos</label>
+                        <input type="number" min="0" max="59" class="form-control" id="minutes" name="minutes" 
+                               value="{{ config.next_withdrawal_minutes % 60 }}" required>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Salvar Configurações</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

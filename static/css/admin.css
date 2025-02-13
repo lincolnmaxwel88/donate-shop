@@ -1,0 +1,33 @@
+/* Estilos para área administrativa */
+.table-responsive {
+    margin-bottom: 1rem;
+}
+
+.badge {
+    font-size: 0.875rem;
+}
+
+.btn-group {
+    gap: 0.5rem;
+}
+
+.modal-dialog {
+    max-width: 500px;
+}
+
+.form-label {
+    font-weight: 500;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-title {
+    color: #333;
+    font-weight: 500;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}

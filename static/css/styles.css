@@ -1,0 +1,12 @@
+.btn-like.liked {
+    background-color: #ff4d6d !important;
+}
+
+.btn-like.liked i,
+.btn-like.liked span {
+    color: #ffb3c1 !important;
+}
+
+.btn-like:not(.liked) i {
+    color: #dc3545;
+}

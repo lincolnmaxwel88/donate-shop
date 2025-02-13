@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from werkzeug.utils import secure_filename
 from functools import wraps
@@ -13,6 +13,9 @@ import time
 import stripe
 from flask_mail import Mail, Message
 from config import Config
+from sqlalchemy import text
+from sqlalchemy import func
+import cloudinary
 
 # Configuração do Stripe
 stripe.api_key = 'sk_test_51QbVcLKxtlwVKoGi0AuzhFm6FmgCDnwZPmMZMCKYuBmex3wb4N9yIcOTubCJb9GGpF37zBnX1YZqeo7fd68GGyHX00j2yH2KeX'
@@ -25,7 +28,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///don
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
-app.config['CONTACT_EMAIL'] = 'your-contact-email@example.com'
 
 # Cria a pasta de uploads se não existir
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -53,7 +55,8 @@ class User(UserMixin, db.Model):
     is_blocked = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
     profile_image = db.Column(db.String(100))
-    campaigns = db.relationship('Campaign', backref='creator', lazy=True)
+    pix_key = db.Column(db.String(100), nullable=True)
+    campaigns = db.relationship('Campaign', backref='user', lazy=True)
     donations = db.relationship('Donation', backref='donor', lazy=True)
     likes = db.relationship('Like', backref='user', lazy=True)
     comments = db.relationship('Comment', backref='author', lazy=True)
@@ -72,45 +75,60 @@ class Campaign(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    goal = db.Column(db.Float, nullable=False)
-    current_amount = db.Column(db.Float, default=0)
-    withdrawn_amount = db.Column(db.Float, default=0)
-    end_date = db.Column(db.DateTime, nullable=True)
+    goal = db.Column(db.Float)
+    image = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    image = db.Column(db.String(100))
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    end_date = db.Column(db.DateTime)
     allow_comments = db.Column(db.Boolean, default=True)
-    views = db.Column(db.Integer, default=0)
-    likes = db.relationship('Like', backref='campaign', lazy=True)
+    is_active = db.Column(db.Boolean, default=True)  # Nova coluna
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     donations = db.relationship('Donation', backref='campaign', lazy=True)
+    withdrawal_requests = db.relationship('WithdrawalRequest', backref='campaign', lazy=True)
     comments = db.relationship('Comment', backref='campaign', lazy=True, cascade='all, delete-orphan')
     campaign_views = db.relationship('CampaignView', backref='campaign', lazy=True)
-    # Relação com WithdrawalRequest
-    withdrawals = db.relationship('WithdrawalRequest',
-                                backref=db.backref('campaign', lazy=True),
-                                lazy=True)
-
-    @property
-    def progress_percentage(self):
-        if self.goal <= 0:
-            return 0
-        return min(100, (self.current_amount / self.goal) * 100)
+    likes = db.relationship('Like', backref='campaign', lazy=True)
     
     @property
-    def days_remaining(self):
-        if not self.end_date:
-            return None
-        delta = self.end_date - datetime.utcnow()
-        return max(0, delta.days)
+    def total_donated(self):
+        return sum(d.amount for d in self.donations)
+    
+    @property
+    def total_net(self):
+        return sum(d.net_amount for d in self.donations)
+    
+    @property
+    def total_withdrawn(self):
+        return sum(w.amount for w in self.withdrawal_requests if w.status == 'approved') or 0
     
     @property
     def available_for_withdrawal(self):
-        """Retorna o valor disponível para saque"""
-        return max(0, self.current_amount - self.withdrawn_amount)
+        return self.total_net - self.total_withdrawn
+    
+    @property
+    def image_url(self):
+        return self.image
+    
+    @property
+    def current_amount(self):
+        """Compatibilidade com o template antigo"""
+        return self.total_donated
+    
+    @property
+    def progress_percentage(self):
+        """Calcula a porcentagem de progresso da meta"""
+        if not self.goal or self.goal <= 0:
+            return 0
+        return min(100, (self.total_donated / self.goal) * 100)
+    
+    @property
+    def views(self):
+        """Retorna o número total de visualizações da campanha"""
+        return len(self.campaign_views)
 
 class Donation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     amount = db.Column(db.Float, nullable=False)
+    net_amount = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False)
@@ -120,7 +138,6 @@ class Like(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False)
-    
     # Garante que cada usuário só pode curtir uma vez
     __table_args__ = (
         db.UniqueConstraint('user_id', 'campaign_id', name='unique_user_like'),
@@ -145,17 +162,22 @@ class WithdrawalRequest(db.Model):
     campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)
-    fee_percentage = db.Column(db.Float, nullable=False)  # Taxa aplicada no momento da solicitação
-    net_amount = db.Column(db.Float, nullable=False)  # Valor após a dedução da taxa
-    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    fee_percentage = db.Column(db.Float, nullable=False)
+    net_amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(20), default='pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     processed_at = db.Column(db.DateTime)
     processed_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    notes = db.Column(db.Text)  # Para comentários do admin
+    notes = db.Column(db.Text)
+    next_attempt_allowed_at = db.Column(db.DateTime, nullable=True)
 
 class SystemConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    withdrawal_fee = db.Column(db.Float, nullable=False, default=5.0)  # Taxa padrão de 5%
+    withdrawal_fee = db.Column(db.Float, default=5.0)
+    min_withdrawal_percentage = db.Column(db.Float, default=10.0)
+    next_withdrawal_minutes = db.Column(db.Integer, default=1440)  # 24 horas em minutos
+    gateway_fee_percentage = db.Column(db.Float, default=3.99)  # Taxa percentual do gateway (%)
+    gateway_fee_fixed = db.Column(db.Float, default=0.39)  # Taxa fixa do gateway (R$)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     
@@ -190,27 +212,38 @@ def format_currency_br(value):
     if value is None:
         return "R$ 0,00"
     try:
-        # Formata o número com 2 casas decimais
         value = float(value)
-        # Separa a parte inteira da decimal
         int_part = int(value)
         decimal_part = int((value - int_part) * 100)
-        
-        # Formata a parte inteira com pontos a cada 3 dígitos
         str_int = str(int_part)
         groups = []
         while str_int:
             groups.insert(0, str_int[-3:])
             str_int = str_int[:-3]
         formatted_int = '.'.join(groups)
-        
-        # Junta tudo no formato R$ X.XXX,XX
         return f"R$ {formatted_int},{decimal_part:02d}"
     except:
         return "R$ 0,00"
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+
+def get_waiting_time_for_withdrawal(campaign):
+    """Calcula o tempo de espera restante para próxima retirada"""
+    last_rejected = WithdrawalRequest.query.filter_by(
+        campaign_id=campaign.id,
+        status='rejected'
+    ).order_by(WithdrawalRequest.created_at.desc()).first()
+    
+    if last_rejected:
+        config = SystemConfig.query.first()
+        next_withdrawal_minutes = config.next_withdrawal_minutes if config else 1440
+        time_since_reject = datetime.utcnow() - last_rejected.processed_at
+        
+        if time_since_reject.total_seconds() < (next_withdrawal_minutes * 60):
+            return int(next_withdrawal_minutes - (time_since_reject.total_seconds() / 60))
+    
+    return None
 
 # Rotas
 @app.route('/')
@@ -232,10 +265,11 @@ def contact():
         message = request.form.get('message')
         
         try:
-            # Criar o email
             msg = Message(
                 subject=f'Contato do Site: {subject}',
+                sender=app.config['MAIL_DEFAULT_SENDER'],
                 recipients=[app.config['CONTACT_EMAIL']],
+                reply_to=email,
                 body=f'''
 Nova mensagem de contato:
 
@@ -248,22 +282,39 @@ Mensagem:
 {message}
 ''')
             
-            # Enviar o email
             mail.send(msg)
             
             flash('Sua mensagem foi enviada com sucesso! Entraremos em contato em breve.', 'success')
         except Exception as e:
-            flash('Erro ao enviar mensagem. Por favor, tente novamente mais tarde.', 'error')
-            print(f'Erro ao enviar email: {str(e)}')
+            error_msg = str(e)
+            flash(f'Erro ao enviar mensagem: {error_msg}', 'error')
+            app.logger.error(f'Erro ao enviar email: {error_msg}')
         
         return redirect(url_for('contact'))
     
     return render_template('contact.html', current_year=datetime.now().year)
 
-@app.route('/profile')
+@app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
-    # Estatísticas do usuário
+    if request.method == 'POST':
+        if 'profile_image' in request.files:
+            file = request.files['profile_image']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                current_user.profile_image = filename
+                db.session.commit()
+                flash('Foto de perfil atualizada com sucesso!', 'success')
+        
+        pix_key = request.form.get('pix_key')
+        if pix_key is not None:
+            current_user.pix_key = pix_key
+            db.session.commit()
+            flash('Chave PIX atualizada com sucesso!', 'success')
+        
+        return redirect(url_for('profile'))
+    
     total_campaigns = Campaign.query.filter_by(user_id=current_user.id).count()
     total_donations = Donation.query.filter_by(user_id=current_user.id).count()
     total_likes = Like.query.filter_by(user_id=current_user.id).count()
@@ -277,8 +328,8 @@ def profile():
 @app.route('/my_campaigns')
 @login_required
 def my_campaigns():
-    campaigns = Campaign.query.filter_by(user_id=current_user.id).order_by(Campaign.created_at.desc()).all()
-    return render_template('my_campaigns.html', campaigns=campaigns, current_year=datetime.now().year)
+    campaigns = Campaign.query.filter_by(user_id=current_user.id).all()
+    return render_template('my_campaigns.html', campaigns=campaigns)
 
 @app.route('/my_donations')
 @login_required
@@ -299,10 +350,9 @@ def new_campaign():
             title=title,
             description=description,
             goal=goal,
-            creator=current_user
+            user_id=current_user.id
         )
         
-        # Handle image upload
         if 'image' in request.files:
             file = request.files['image']
             if file and allowed_file(file.filename):
@@ -324,7 +374,6 @@ def new_campaign():
 @app.route('/user_likes')
 @login_required
 def user_likes():
-    # Pegar as campanhas que o usuário curtiu
     liked_campaigns = Campaign.query\
         .join(Like)\
         .filter(Like.user_id == current_user.id)\
@@ -339,16 +388,13 @@ def user_likes():
 @login_required
 @admin_required
 def admin_dashboard():
-    # Estatísticas gerais
     total_users = User.query.count()
     total_campaigns = Campaign.query.count()
     total_donations = Donation.query.count()
     total_amount = db.session.query(db.func.sum(Donation.amount)).scalar() or 0
     
-    # Lista de usuários
     users = User.query.order_by(User.username).all()
     
-    # Últimas campanhas
     recent_campaigns = Campaign.query.order_by(Campaign.created_at.desc()).limit(10).all()
     
     return render_template('admin_dashboard.html',
@@ -366,7 +412,6 @@ def admin_dashboard():
 def toggle_admin(user_id):
     user = User.query.get_or_404(user_id)
     
-    # Não permitir que um admin remova seus próprios privilégios
     if user.id == current_user.id:
         return jsonify({'success': False, 'message': 'Você não pode remover seus próprios privilégios de administrador'})
     
@@ -384,11 +429,9 @@ def toggle_admin(user_id):
 def toggle_block(user_id):
     user = User.query.get_or_404(user_id)
     
-    # Não permitir bloquear um admin
     if user.is_admin:
         return jsonify({'success': False, 'message': 'Não é possível bloquear um administrador'})
     
-    # Não permitir que um admin bloqueie a si mesmo
     if user.id == current_user.id:
         return jsonify({'success': False, 'message': 'Você não pode bloquear a si mesmo'})
     
@@ -462,38 +505,45 @@ def campaign(campaign_id):
     donations = Donation.query.filter_by(campaign_id=campaign_id).order_by(Donation.created_at.desc()).all()
     comments = Comment.query.filter_by(campaign_id=campaign_id).order_by(Comment.created_at.desc()).all()
     
-    # Registrar visualização
-    if current_user.is_authenticated:
-        # Pegar o IP do usuário
-        ip_address = request.remote_addr
-        
-        # Verificar se já existe uma visualização por IP ou por usuário
-        view = CampaignView.query.filter(
-            CampaignView.campaign_id == campaign_id,
-            db.or_(
-                CampaignView.ip_address == ip_address,
-                CampaignView.user_id == current_user.id
-            )
-        ).first()
-        
-        if not view:
-            view = CampaignView(
-                campaign_id=campaign_id,
-                user_id=current_user.id,
-                ip_address=ip_address
-            )
-            campaign.views += 1
-            db.session.add(view)
+    # Registra visualização
+    if current_user.is_authenticated and current_user.id != campaign.user_id:
+        view = CampaignView(
+            campaign_id=campaign_id,
+            user_id=current_user.id,
+            ip_address=request.remote_addr
+        )
+        db.session.add(view)
+        try:
             db.session.commit()
+        except:
+            db.session.rollback()
     
-    # Obter a taxa de retirada das configurações
+    # Verifica se o usuário atual já curtiu
+    user_liked = False
+    if current_user.is_authenticated:
+        like = Like.query.filter_by(
+            campaign_id=campaign_id,
+            user_id=current_user.id
+        ).first()
+        user_liked = like is not None
+    
+    # Busca configurações do sistema
     config = SystemConfig.query.first()
     withdrawal_fee = config.withdrawal_fee if config else 5.0
+    
+    # Calcula valores
+    total_donated = campaign.total_donated
+    total_net = campaign.total_net
+    available_for_withdrawal = campaign.available_for_withdrawal
     
     return render_template('campaign.html',
                          campaign=campaign,
                          donations=donations,
                          comments=comments,
+                         user_liked=user_liked,
+                         total_donated=total_donated,
+                         total_net=total_net,
+                         available_for_withdrawal=available_for_withdrawal,
                          withdrawal_fee=withdrawal_fee,
                          now=datetime.utcnow())
 
@@ -502,71 +552,88 @@ def campaign(campaign_id):
 def donate(campaign_id):
     campaign = Campaign.query.get_or_404(campaign_id)
     
-    # Pegar o valor e converter para o formato correto
-    amount_str = request.form.get('amount', '0')
-    try:
-        # Remove qualquer caractere que não seja número ou vírgula
-        amount_str = ''.join(c for c in amount_str if c.isdigit() or c == ',')
-        # Converte vírgula para ponto
-        amount = float(amount_str.replace(',', '.'))
-    except ValueError:
-        flash('Por favor, insira um valor válido.', 'error')
+    # Verifica se a campanha está ativa
+    if not campaign.is_active:
+        flash('Esta campanha foi encerrada e não está mais aceitando doações.', 'error')
         return redirect(url_for('campaign', campaign_id=campaign_id))
     
-    if not amount or amount <= 0:
-        flash('Por favor, insira um valor válido.', 'error')
+    if campaign.end_date:
+        flash('Esta campanha foi encerrada e não está mais aceitando doações.', 'error')
         return redirect(url_for('campaign', campaign_id=campaign_id))
     
     try:
-        # Criar sessão de checkout do Stripe
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price_data': {
-                    'currency': 'brl',
-                    'unit_amount': int(amount * 100),  # Stripe trabalha com centavos
-                    'product_data': {
-                        'name': f'Doação para: {campaign.title}',
-                        'description': f'Campanha criada por {campaign.creator.username}',
+        # Trata o valor da doação, removendo R$ e substituindo vírgula por ponto
+        amount_str = request.form.get('amount', '0')
+        amount_str = amount_str.replace('R$', '').replace('.', '').replace(',', '.')
+        amount = float(amount_str)
+        
+        if amount <= 0:
+            flash('O valor da doação deve ser maior que zero.', 'error')
+            return redirect(url_for('campaign', campaign_id=campaign_id))
+        
+        # Calcula as taxas do gateway
+        config = SystemConfig.query.first()
+        if config:
+            gateway_fee = (amount * config.gateway_fee_percentage / 100) + config.gateway_fee_fixed
+            net_amount = amount - gateway_fee
+        else:
+            net_amount = amount
+            
+        try:
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price_data': {
+                        'currency': 'brl',
+                        'unit_amount': int(amount * 100),  # Stripe usa centavos
+                        'product_data': {
+                            'name': f'Doação para: {campaign.title}',
+                            'description': f'Campanha criada por {campaign.user.username}',
+                        },
                     },
-                },
-                'quantity': 1,
-            }],
-            mode='payment',
-            success_url=url_for('donation_success', campaign_id=campaign_id, amount=amount, _external=True),
-            cancel_url=url_for('donation_cancel', campaign_id=campaign_id, _external=True),
-            metadata={
-                'campaign_id': campaign_id,
-                'user_id': current_user.id,
-                'amount': amount
-            }
-        )
-        return redirect(checkout_session.url, code=303)
+                    'quantity': 1,
+                }],
+                mode='payment',
+                success_url=url_for('donation_success', campaign_id=campaign_id, amount=amount, net_amount=net_amount, _external=True),
+                cancel_url=url_for('donation_cancel', campaign_id=campaign_id, _external=True),
+                metadata={
+                    'campaign_id': campaign_id,
+                    'user_id': current_user.id,
+                    'amount': amount,
+                    'net_amount': net_amount
+                }
+            )
+            return redirect(checkout_session.url, code=303)
+        except Exception as e:
+            app.logger.error(f"Erro Stripe: {str(e)}")
+            flash('Erro ao processar pagamento. Por favor, tente novamente.', 'error')
+            return redirect(url_for('campaign', campaign_id=campaign_id))
+            
+    except ValueError:
+        flash('Por favor, insira um valor válido para a doação.', 'error')
     except Exception as e:
-        app.logger.error(f"Erro Stripe: {str(e)}")
-        flash('Erro ao processar pagamento. Por favor, tente novamente.', 'error')
-        return redirect(url_for('campaign', campaign_id=campaign_id))
+        flash('Erro ao processar doação. Por favor, tente novamente.', 'error')
+        app.logger.error(f'Erro ao processar doação: {str(e)}')
+    
+    return redirect(url_for('campaign', campaign_id=campaign_id))
 
 @app.route('/donation/success/<int:campaign_id>')
 @login_required
 def donation_success(campaign_id):
-    amount = request.args.get('amount', type=float)
-    campaign = Campaign.query.get_or_404(campaign_id)
+    amount = float(request.args.get('amount', 0))
+    net_amount = float(request.args.get('net_amount', 0))
     
-    # Criar a doação
     donation = Donation(
-        amount=amount,
+        campaign_id=campaign_id,
         user_id=current_user.id,
-        campaign_id=campaign_id
+        amount=amount,
+        net_amount=net_amount
     )
-    
-    # Atualizar o valor arrecadado da campanha
-    campaign.current_amount += amount
     
     db.session.add(donation)
     db.session.commit()
     
-    flash('Doação realizada com sucesso! Obrigado pela sua contribuição.', 'success')
+    flash('Doação realizada com sucesso! Obrigado por ajudar.', 'success')
     return redirect(url_for('campaign', campaign_id=campaign_id))
 
 @app.route('/donation/cancel/<int:campaign_id>')
@@ -582,7 +649,7 @@ def stripe_webhook():
 
     try:
         event = stripe.Webhook.construct_event(
-            payload, sig_header, 'seu_webhook_secret'  # Você precisará configurar isso no painel do Stripe
+            payload, sig_header, 'seu_webhook_secret'
         )
     except ValueError as e:
         return 'Invalid payload', 400
@@ -592,7 +659,6 @@ def stripe_webhook():
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
         
-        # Processar o pagamento bem-sucedido
         campaign_id = session['metadata']['campaign_id']
         user_id = session['metadata']['user_id']
         amount = float(session['metadata']['amount'])
@@ -615,25 +681,21 @@ def stripe_webhook():
 def toggle_like(campaign_id):
     campaign = Campaign.query.get_or_404(campaign_id)
     
-    # Verificar se o usuário já curtiu
     like = Like.query.filter_by(
         user_id=current_user.id,
         campaign_id=campaign_id
     ).first()
     
     if like:
-        # Se já curtiu, remove o like
         db.session.delete(like)
         liked = False
     else:
-        # Se não curtiu, adiciona o like
         like = Like(user_id=current_user.id, campaign_id=campaign_id)
         db.session.add(like)
         liked = True
     
     db.session.commit()
     
-    # Contar o número total de likes
     total_likes = Like.query.filter_by(campaign_id=campaign_id).count()
     
     return jsonify({
@@ -662,45 +724,30 @@ def add_comment(campaign_id):
     flash('Comentário adicionado com sucesso!', 'success')
     return redirect(url_for('campaign', campaign_id=campaign_id))
 
-@app.route('/campaign/<int:campaign_id>/update_image', methods=['POST'])
+@app.route('/campaign/<int:campaign_id>/image/remove', methods=['POST'])
 @login_required
-def update_campaign_image(campaign_id):
+def remove_campaign_image(campaign_id):
     campaign = Campaign.query.get_or_404(campaign_id)
     
-    if campaign.creator != current_user and not current_user.is_admin:
-        abort(403)
-    
-    if 'image' not in request.files:
-        flash('Nenhum arquivo selecionado', 'error')
+    if campaign.user_id != current_user.id:
+        flash('Você não tem permissão para alterar esta campanha.', 'error')
         return redirect(url_for('campaign', campaign_id=campaign_id))
     
-    file = request.files['image']
-    if file.filename == '':
-        flash('Nenhum arquivo selecionado', 'error')
-        return redirect(url_for('campaign', campaign_id=campaign_id))
-    
-    if file and allowed_file(file.filename):
-        # Remove a imagem antiga se existir
+    try:
+        # Remove o arquivo antigo se existir
         if campaign.image and campaign.image != 'default_campaign.jpg':
             old_image_path = os.path.join(app.config['UPLOAD_FOLDER'], campaign.image)
             if os.path.exists(old_image_path):
                 os.remove(old_image_path)
         
-        # Salva a nova imagem
-        filename = secure_filename(file.filename)
-        timestamp = int(time.time())
-        filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        file.save(filepath)
-        
-        campaign.image = filename
+        # Define a imagem padrão
+        campaign.image = None
         db.session.commit()
-        
-        flash('Imagem atualizada com sucesso!', 'success')
-        return redirect(url_for('campaign', campaign_id=campaign_id))
+        flash('Imagem removida com sucesso!', 'success')
+    except Exception as e:
+        app.logger.error(f'Erro ao remover imagem: {str(e)}')
+        flash('Erro ao remover imagem. Tente novamente.', 'error')
     
-    flash('Tipo de arquivo não permitido', 'error')
     return redirect(url_for('campaign', campaign_id=campaign_id))
 
 @app.route('/update_profile_photo', methods=['POST'])
@@ -716,18 +763,14 @@ def update_profile_photo():
         return redirect(url_for('profile'))
     
     if photo and allowed_file(photo.filename):
-        # Gerar um nome único para o arquivo
         filename = secure_filename(f"{current_user.username}_{int(time.time())}_{photo.filename}")
-        # Criar pasta profiles se não existir
         profiles_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'profiles')
         if not os.path.exists(profiles_folder):
             os.makedirs(profiles_folder)
         
-        # Salvar a foto na pasta profiles
         photo_path = os.path.join(profiles_folder, filename)
         photo.save(photo_path)
         
-        # Atualizar o perfil do usuário com o caminho relativo usando forward slash
         current_user.profile_image = 'profiles/' + filename
         db.session.commit()
         
@@ -741,107 +784,170 @@ def update_profile_photo():
 @login_required
 def donation_history(campaign_id):
     campaign = Campaign.query.get_or_404(campaign_id)
-    # Verificar se o usuário é o dono da campanha ou admin
     if current_user.id != campaign.user_id and not current_user.is_admin:
         abort(403)
     
     donations = Donation.query.filter_by(campaign_id=campaign_id)\
         .order_by(Donation.created_at.desc()).all()
     
+    total_amount = sum(donation.amount for donation in donations)
+    
     return render_template('donation_history.html', 
                          campaign=campaign, 
                          donations=donations,
+                         total_amount=total_amount,
                          current_year=datetime.now().year)
 
-@app.route('/campaign/<int:campaign_id>/request-withdrawal', methods=['POST'])
+# Rotas de Retirada
+@app.route('/request_withdrawal/<int:campaign_id>', methods=['POST'])
 @login_required
 def request_withdrawal(campaign_id):
     campaign = Campaign.query.get_or_404(campaign_id)
     
-    # Verificar se o usuário é o dono da campanha
     if campaign.user_id != current_user.id:
-        abort(403)
+        flash('Você não tem permissão para solicitar retirada desta campanha.', 'error')
+        return redirect(url_for('manage_withdrawals'))
     
-    # Verificar se já existe alguma solicitação de retirada (independente do status)
-    existing_withdrawal = WithdrawalRequest.query.filter_by(campaign_id=campaign_id).first()
-    if existing_withdrawal:
-        flash('Esta campanha já possui uma solicitação de retirada. Não é possível solicitar mais de uma vez.', 'warning')
-        return redirect(url_for('campaign', campaign_id=campaign_id))
-    
-    # Verificar se há valor disponível para retirada
-    if campaign.available_for_withdrawal <= 0:
-        flash('Não há valor disponível para retirada.', 'warning')
-        return redirect(url_for('campaign', campaign_id=campaign_id))
-    
-    # Obter a taxa de retirada das configurações
-    config = SystemConfig.query.first()
-    fee_percentage = config.withdrawal_fee if config else 5.0
-    
-    # Calcular valores
-    amount = campaign.available_for_withdrawal
-    net_amount = amount * (1 - fee_percentage/100)
-    
-    # Criar a solicitação de retirada
-    withdrawal = WithdrawalRequest(
+    # Verifica se já existe uma retirada pendente
+    pending_withdrawal = WithdrawalRequest.query.filter_by(
         campaign_id=campaign_id,
-        user_id=current_user.id,
-        amount=amount,
-        fee_percentage=fee_percentage,
-        net_amount=net_amount
-    )
+        status='pending'
+    ).first()
     
-    # Encerrar a campanha
-    campaign.end_date = datetime.utcnow()
+    if pending_withdrawal:
+        flash('Já existe uma solicitação de retirada pendente para esta campanha.', 'error')
+        return redirect(url_for('manage_withdrawals'))
     
-    db.session.add(withdrawal)
-    db.session.commit()
+    try:
+        # Calcula o valor disponível para retirada
+        available = campaign.available_for_withdrawal
+        
+        # Verifica se há configurações no sistema
+        config = SystemConfig.query.first()
+        min_percentage = config.min_withdrawal_percentage if config else 10.0
+        withdrawal_fee = config.withdrawal_fee if config else 5.0
+        
+        # Calcula o valor mínimo baseado na meta da campanha
+        min_withdrawal = (campaign.goal * min_percentage / 100)
+
+        if available < min_withdrawal:
+            flash(f'Valor mínimo para retirada é {format_currency_br(min_withdrawal)} ({min_percentage}% da meta de {format_currency_br(campaign.goal)})', 'error')
+            return redirect(url_for('manage_withdrawals'))
+        
+        # Verifica o tempo desde a última retirada rejeitada
+        last_rejected = WithdrawalRequest.query.filter_by(
+            campaign_id=campaign_id,
+            status='rejected'
+        ).order_by(WithdrawalRequest.created_at.desc()).first()
+        
+        if last_rejected and last_rejected.next_attempt_allowed_at:
+            if datetime.utcnow() < last_rejected.next_attempt_allowed_at:
+                waiting_minutes = int((last_rejected.next_attempt_allowed_at - datetime.utcnow()).total_seconds() / 60)
+                flash(f'Aguarde {waiting_minutes // 60}h{waiting_minutes % 60}min para solicitar nova retirada.', 'error')
+                return redirect(url_for('manage_withdrawals'))
+        
+        # Cria a solicitação de retirada
+        withdrawal = WithdrawalRequest(
+            amount=available,
+            fee_percentage=withdrawal_fee,
+            net_amount=available * (1 - withdrawal_fee/100),
+            campaign_id=campaign_id,
+            user_id=current_user.id,
+            status='pending'
+        )
+        
+        # Desativa a campanha temporariamente
+        campaign.is_active = False
+        campaign.end_date = datetime.utcnow()
+        
+        db.session.add(withdrawal)
+        db.session.commit()
+        
+        flash('Solicitação de retirada enviada com sucesso! A campanha foi temporariamente desativada.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Erro ao solicitar retirada. Por favor, tente novamente.', 'error')
+        app.logger.error(f'Erro ao solicitar retirada: {str(e)}')
     
-    flash('Sua solicitação de retirada foi enviada! A campanha foi encerrada e não receberá mais doações.', 'success')
-    return redirect(url_for('campaign', campaign_id=campaign_id))
+    return redirect(url_for('manage_withdrawals'))
 
 @app.route('/admin/withdrawals')
 @login_required
 @admin_required
 def admin_withdrawals():
+    # Busca todas as retiradas, ordenadas por data de criação (mais recentes primeiro)
     withdrawals = WithdrawalRequest.query.order_by(WithdrawalRequest.created_at.desc()).all()
     return render_template('admin/withdrawals.html', withdrawals=withdrawals)
 
-@app.route('/admin/withdrawals/approve/<int:withdrawal_id>', methods=['POST'])
+@app.route('/admin/withdrawals/<int:withdrawal_id>/approve', methods=['POST'])
 @login_required
 @admin_required
 def approve_withdrawal(withdrawal_id):
     withdrawal = WithdrawalRequest.query.get_or_404(withdrawal_id)
+    
     if withdrawal.status != 'pending':
-        flash('Esta solicitação já foi processada.', 'warning')
+        flash('Esta retirada já foi processada.', 'error')
         return redirect(url_for('admin_withdrawals'))
     
-    withdrawal.status = 'approved'
-    withdrawal.processed_at = datetime.utcnow()
-    withdrawal.processed_by_id = current_user.id
-    db.session.commit()
+    try:
+        # Atualiza o status da retirada
+        withdrawal.status = 'approved'
+        withdrawal.processed_at = datetime.utcnow()
+        withdrawal.processed_by_id = current_user.id
+        
+        # Mantém a campanha desativada
+        campaign = withdrawal.campaign
+        campaign.is_active = False
+        campaign.end_date = datetime.utcnow()
+        
+        db.session.commit()
+        flash('Retirada aprovada com sucesso! A campanha foi encerrada.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Erro ao aprovar retirada. Por favor, tente novamente.', 'error')
+        app.logger.error(f'Erro ao aprovar retirada: {str(e)}')
     
-    flash('Solicitação de retirada aprovada com sucesso!', 'success')
     return redirect(url_for('admin_withdrawals'))
 
-@app.route('/admin/withdrawals/reject/<int:withdrawal_id>', methods=['POST'])
+@app.route('/admin/withdrawals/<int:withdrawal_id>/reject', methods=['POST'])
 @login_required
 @admin_required
 def reject_withdrawal(withdrawal_id):
     withdrawal = WithdrawalRequest.query.get_or_404(withdrawal_id)
+    
     if withdrawal.status != 'pending':
-        flash('Esta solicitação já foi processada.', 'warning')
+        flash('Esta retirada já foi processada.', 'error')
         return redirect(url_for('admin_withdrawals'))
     
-    # Devolver o valor para o saldo disponível
-    campaign = withdrawal.campaign
-    campaign.withdrawn_amount -= withdrawal.amount
+    notes = request.form.get('notes')
+    if not notes:
+        flash('É necessário informar o motivo da rejeição.', 'error')
+        return redirect(url_for('admin_withdrawals'))
     
-    withdrawal.status = 'rejected'
-    withdrawal.processed_at = datetime.utcnow()
-    withdrawal.processed_by_id = current_user.id
-    db.session.commit()
+    try:
+        # Atualiza o status da retirada
+        withdrawal.status = 'rejected'
+        withdrawal.processed_at = datetime.utcnow()
+        withdrawal.processed_by_id = current_user.id
+        withdrawal.notes = notes
+        
+        # Reativa a campanha
+        campaign = withdrawal.campaign
+        campaign.is_active = True
+        campaign.end_date = None  # Remove a data de encerramento
+        
+        # Define o tempo para próxima tentativa
+        config = SystemConfig.query.first()
+        next_withdrawal_minutes = config.next_withdrawal_minutes if config else 1440
+        withdrawal.next_attempt_allowed_at = datetime.utcnow() + timedelta(minutes=next_withdrawal_minutes)
+        
+        db.session.commit()
+        flash('Retirada rejeitada com sucesso! A campanha foi reativada.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Erro ao rejeitar retirada. Por favor, tente novamente.', 'error')
+        app.logger.error(f'Erro ao rejeitar retirada: {str(e)}')
     
-    flash('Solicitação de retirada rejeitada com sucesso!', 'success')
     return redirect(url_for('admin_withdrawals'))
 
 @app.route('/admin/config', methods=['GET', 'POST'])
@@ -876,31 +982,24 @@ def admin_config():
 @admin_required
 def clear_database():
     try:
-        # Usar o usuário atual (que já sabemos que é admin devido ao @admin_required)
         admin_user = current_user
         
-        # Excluir todas as solicitações de retirada
         WithdrawalRequest.query.delete()
         
-        # Excluir todas as doações
         Donation.query.delete()
         
-        # Excluir todos os comentários
         Comment.query.delete()
         
-        # Excluir todas as visualizações
         CampaignView.query.delete()
         
-        # Excluir todas as curtidas
         Like.query.delete()
         
-        # Excluir todas as campanhas
         Campaign.query.delete()
         
-        # Excluir todos os usuários exceto o admin atual
         User.query.filter(User.id != admin_user.id).delete()
         
         db.session.commit()
+        
         flash('Banco de dados limpo com sucesso! Apenas o seu usuário foi mantido.', 'success')
         
     except Exception as e:
@@ -909,12 +1008,211 @@ def clear_database():
     
     return redirect(url_for('admin_dashboard'))
 
+@app.route('/admin/user/<int:user_id>')
+@login_required
+@admin_required
+def admin_user_details(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    campaigns = Campaign.query.filter_by(user_id=user_id).all()
+    
+    donations = Donation.query.filter_by(user_id=user_id)\
+        .join(Campaign)\
+        .order_by(Donation.created_at.desc())\
+        .all()
+    
+    likes = Like.query.filter_by(user_id=user_id)\
+        .join(Campaign)\
+        .order_by(Like.created_at.desc())\
+        .all()
+    
+    return render_template('admin/user_details.html',
+                         user=user,
+                         campaigns=campaigns,
+                         donations=donations,
+                         likes=likes,
+                         current_year=datetime.now().year)
+
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_settings():
+    config = SystemConfig.query.first()
+    if not config:
+        config = SystemConfig()
+        db.session.add(config)
+        db.session.commit()
+    
+    if request.method == 'POST':
+        try:
+            config.withdrawal_fee = float(request.form.get('withdrawal_fee', 5.0))
+            config.min_withdrawal_percentage = float(request.form.get('min_withdrawal_percentage', 10.0))
+            config.gateway_fee_percentage = float(request.form.get('gateway_fee_percentage', 3.99))
+            config.gateway_fee_fixed = float(request.form.get('gateway_fee_fixed', 0.39))
+            
+            # Calcula o total de minutos baseado em dias, horas e minutos
+            days = int(request.form.get('days', 0))
+            hours = int(request.form.get('hours', 0))
+            minutes = int(request.form.get('minutes', 0))
+            
+            total_minutes = (days * 24 * 60) + (hours * 60) + minutes
+            if total_minutes < 1:
+                total_minutes = 1  # Mínimo de 1 minuto
+            
+            config.next_withdrawal_minutes = total_minutes
+            
+            db.session.commit()
+            flash('Configurações atualizadas com sucesso!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash('Erro ao atualizar configurações. Por favor, tente novamente.', 'error')
+            app.logger.error(f'Erro ao atualizar configurações: {str(e)}')
+    
+    return render_template('admin/settings.html', config=config)
+
+@app.route('/manage_withdrawals')
+@login_required
+def manage_withdrawals():
+    # Busca as campanhas do usuário
+    campaigns = Campaign.query.filter_by(user_id=current_user.id).all()
+    config = SystemConfig.query.first()
+    withdrawal_fee = config.withdrawal_fee if config else 5.0
+    min_percentage = config.min_withdrawal_percentage if config else 10.0
+    
+    campaigns_data = []
+    for campaign in campaigns:
+        # Calcula valores para cada campanha
+        total_net = campaign.total_net
+        withdrawn = campaign.total_withdrawn
+        available = campaign.available_for_withdrawal
+        
+        # Calcula o valor mínimo baseado na meta da campanha
+        min_withdrawal = (campaign.goal * min_percentage / 100)
+        
+        campaigns_data.append({
+            'campaign': campaign,
+            'total_net': total_net,
+            'withdrawn': withdrawn,
+            'available': available,
+            'min_withdrawal': min_withdrawal,
+            'can_request': available >= min_withdrawal and not WithdrawalRequest.query.filter_by(campaign_id=campaign.id, status='pending').first(),
+            'pending_withdrawal': WithdrawalRequest.query.filter_by(campaign_id=campaign.id, status='pending').first(),
+            'recent_withdrawals': WithdrawalRequest.query.filter_by(campaign_id=campaign.id).order_by(WithdrawalRequest.created_at.desc()).limit(5).all(),
+            'waiting_time': get_waiting_time_for_withdrawal(campaign)
+        })
+
+    return render_template('manage_withdrawals.html',
+                         campaigns_data=campaigns_data,
+                         withdrawal_fee=withdrawal_fee,
+                         min_withdrawal_percentage=min_percentage)
+
+@app.route('/campaign/<int:campaign_id>/update_image', methods=['POST'])
+@login_required
+def update_campaign_image(campaign_id):
+    campaign = Campaign.query.get_or_404(campaign_id)
+    
+    if campaign.user_id != current_user.id:
+        flash('Você não tem permissão para alterar esta campanha.', 'error')
+        return redirect(url_for('campaign', campaign_id=campaign_id))
+    
+    if 'image' not in request.files:
+        flash('Nenhuma imagem selecionada', 'error')
+        return redirect(url_for('campaign', campaign_id=campaign_id))
+    
+    file = request.files['image']
+    if file.filename == '':
+        flash('Nenhuma imagem selecionada', 'error')
+        return redirect(url_for('campaign', campaign_id=campaign_id))
+    
+    if file and allowed_file(file.filename):
+        if campaign.image and campaign.image != 'default_campaign.jpg':
+            old_image_path = os.path.join(app.config['UPLOAD_FOLDER'], campaign.image)
+            if os.path.exists(old_image_path):
+                os.remove(old_image_path)
+        
+        filename = secure_filename(file.filename)
+        timestamp = int(time.time())
+        filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        file.save(filepath)
+        campaign.image = filename
+        db.session.commit()
+        
+        flash('Imagem atualizada com sucesso!', 'success')
+    else:
+        flash('Tipo de arquivo não permitido', 'error')
+    
+    return redirect(url_for('campaign', campaign_id=campaign_id))
+
 # Registrar filtros Jinja2
 app.jinja_env.filters['format_datetime'] = format_datetime
 app.jinja_env.filters['format_currency_br'] = format_currency_br
 
 # Inicialização
+with app.app_context():
+    # Verificar se a coluna pix_key já existe
+    inspector = db.inspect(db.engine)
+    columns = [col['name'] for col in inspector.get_columns('user')]
+    if 'pix_key' not in columns:
+        # Adicionar a coluna pix_key
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE user ADD COLUMN pix_key VARCHAR(100)'))
+            conn.commit()
+    
+    # Verificar se a coluna next_attempt_allowed_at já existe
+    columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
+    if 'next_attempt_allowed_at' not in columns:
+        # Adicionar a coluna next_attempt_allowed_at
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN next_attempt_allowed_at DATETIME'))
+            conn.commit()
+    
+    # Verificar se as colunas do SystemConfig existem
+    columns = [col['name'] for col in inspector.get_columns('system_config')]
+    if 'min_withdrawal_percentage' not in columns:
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE system_config ADD COLUMN min_withdrawal_percentage FLOAT DEFAULT 10.0'))
+            conn.commit()
+    if 'next_withdrawal_minutes' not in columns:
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE system_config ADD COLUMN next_withdrawal_minutes INTEGER DEFAULT 1440'))
+            conn.commit()
+    if 'gateway_fee_percentage' not in columns:
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_percentage FLOAT DEFAULT 3.99'))
+            conn.commit()
+    if 'gateway_fee_fixed' not in columns:
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_fixed FLOAT DEFAULT 0.39'))
+            conn.commit()
+    
+    # Verificar se a coluna net_amount já existe na tabela donation
+    columns = [col['name'] for col in inspector.get_columns('donation')]
+    if 'net_amount' not in columns:
+        # Adicionar a coluna net_amount
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE donation ADD COLUMN net_amount FLOAT'))
+            conn.commit()
+        
+        # Atualizar os valores existentes
+        config = SystemConfig.query.first()
+        if config:
+            donations = Donation.query.all()
+            for donation in donations:
+                gateway_fee = (donation.amount * config.gateway_fee_percentage / 100) + config.gateway_fee_fixed
+                donation.net_amount = donation.amount - gateway_fee
+            db.session.commit()
+    
+    # Verificar se a coluna is_active já existe na tabela campaign
+    columns = [col['name'] for col in inspector.get_columns('campaign')]
+    if 'is_active' not in columns:
+        # Adicionar a coluna is_active
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE campaign ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
+            conn.commit()
+    
+    db.create_all()
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # Criar todas as tabelas
     app.run(debug=True)

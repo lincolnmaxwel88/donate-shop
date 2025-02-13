@@ -51,3 +51,11 @@
         transform: scale(1);
     }
 }
+
+.campaign-image {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}

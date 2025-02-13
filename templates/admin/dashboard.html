@@ -60,7 +60,12 @@
                                 {% for user in users %}
                                 <tr>
                                     <td>{{ user.id }}</td>
-                                    <td>{{ user.username }}</td>
+                                    <td>
+                                        <a href="{{ url_for('admin_user_details', user_id=user.id) }}" 
+                                           class="text-decoration-none text-primary">
+                                            {{ user.username }}
+                                        </a>
+                                    </td>
                                     <td>{{ user.email }}</td>
                                     <td>
                                         <form method="POST" action="{{ url_for('toggle_admin', user_id=user.id) }}" class="d-inline">

@@ -69,7 +69,12 @@
                                     <tbody>
                                         {% for user in users %}
                                         <tr>
-                                            <td>{{ user.username }}</td>
+                                            <td>
+                                                <a href="{{ url_for('admin_user_details', user_id=user.id) }}" 
+                                                   class="text-decoration-none text-primary">
+                                                    {{ user.username }}
+                                                </a>
+                                            </td>
                                             <td>{{ user.email }}</td>
                                             <td>{{ user.campaigns|length }}</td>
                                             <td>{{ user.donations|length }}</td>
@@ -138,22 +143,26 @@
                                                     {{ campaign.title }}
                                                 </a>
                                             </td>
-                                            <td>{{ campaign.creator.username }}</td>
+                                            <td>{{ campaign.user.username }}</td>
                                             <td>{{ campaign.goal|format_currency_br }}</td>
-                                            <td>{{ campaign.current_amount|format_currency_br }}</td>
+                                            <td>{{ campaign.total_donated|format_currency_br }}</td>
                                             <td>
-                                                <div class="progress" style="height: 20px;">
-                                                    <div class="progress-bar bg-success" 
-                                                         role="progressbar" 
+                                                <div class="progress">
+                                                    <div class="progress-bar" role="progressbar" 
                                                          style="width: {{ campaign.progress_percentage }}%" 
                                                          aria-valuenow="{{ campaign.progress_percentage }}" 
                                                          aria-valuemin="0" 
                                                          aria-valuemax="100">
-                                                        {{ campaign.progress_percentage }}%
+                                                        {{ "%.1f"|format(campaign.progress_percentage) }}%
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td>{{ campaign.created_at|format_datetime }}</td>
+                                            <td>
+                                                <a href="{{ url_for('campaign', campaign_id=campaign.id) }}" 
+                                                   class="btn btn-primary btn-sm">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Detalhes do Usuário</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Informações do Usuário -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">Informações do Usuário</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3 text-center">
+                    {% if user.profile_image %}
+                        <img src="{{ url_for('static', filename='uploads/' + user.profile_image) }}" 
+                             class="rounded-circle img-thumbnail" 
+                             style="width: 150px; height: 150px; object-fit: cover;"
+                             alt="Foto de perfil">
+                    {% else %}
+                        <i class="fas fa-user-circle fa-6x text-secondary"></i>
+                    {% endif %}
+                </div>
+                <div class="col-md-9">
+                    <h4>{{ user.username }}</h4>
+                    <p class="text-muted">{{ user.email }}</p>
+                    <p><strong>Membro desde:</strong> {{ user.created_at|format_datetime }}</p>
+                    <p>
+                        <span class="badge {% if user.is_admin %}bg-success{% else %}bg-secondary{% endif %} me-2">
+                            {{ 'Administrador' if user.is_admin else 'Usuário' }}
+                        </span>
+                        <span class="badge {% if user.is_blocked %}bg-danger{% else %}bg-success{% endif %}">
+                            {{ 'Bloqueado' if user.is_blocked else 'Ativo' }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campanhas Criadas -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Campanhas Criadas</h5>
+        </div>
+        <div class="card-body">
+            {% if campaigns %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Título</th>
+                                <th>Meta</th>
+                                <th>Arrecadado</th>
+                                <th>Data de Criação</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for campaign in campaigns %}
+                            <tr>
+                                <td>{{ campaign.title }}</td>
+                                <td>{{ campaign.goal|format_currency_br }}</td>
+                                <td>{{ campaign.current_amount|format_currency_br }}</td>
+                                <td>{{ campaign.created_at|format_datetime }}</td>
+                                <td>
+                                    <a href="{{ url_for('campaign', campaign_id=campaign.id) }}" 
+                                       class="btn btn-sm btn-primary">
+                                        Ver Campanha
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">Nenhuma campanha criada.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Doações Realizadas -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Doações Realizadas</h5>
+        </div>
+        <div class="card-body">
+            {% if donations %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Campanha</th>
+                                <th>Valor</th>
+                                <th>Data</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for donation in donations %}
+                            <tr>
+                                <td>{{ donation.campaign.title }}</td>
+                                <td>{{ donation.amount|format_currency_br }}</td>
+                                <td>{{ donation.created_at|format_datetime }}</td>
+                                <td>
+                                    <a href="{{ url_for('campaign', campaign_id=donation.campaign.id) }}" 
+                                       class="btn btn-sm btn-primary">
+                                        Ver Campanha
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">Nenhuma doação realizada.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Curtidas -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Campanhas Curtidas</h5>
+        </div>
+        <div class="card-body">
+            {% if likes %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Campanha</th>
+                                <th>Data da Curtida</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for like in likes %}
+                            <tr>
+                                <td>{{ like.campaign.title }}</td>
+                                <td>{{ like.created_at|format_datetime }}</td>
+                                <td>
+                                    <a href="{{ url_for('campaign', campaign_id=like.campaign.id) }}" 
+                                       class="btn btn-sm btn-primary">
+                                        Ver Campanha
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted">Nenhuma curtida realizada.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

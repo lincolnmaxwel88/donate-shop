@@ -46,6 +46,26 @@
                         </div>
                     </div>
 
+                    <div class="mb-4">
+                        <h5>Chave PIX</h5>
+                        <form method="post">
+                            <div class="input-group">
+                                <input type="text" 
+                                       class="form-control" 
+                                       name="pix_key" 
+                                       value="{{ current_user.pix_key or '' }}"
+                                       placeholder="Digite sua chave PIX"
+                                       required>
+                                <button class="btn btn-primary" type="submit">
+                                    Salvar Chave PIX
+                                </button>
+                            </div>
+                            <small class="text-muted">
+                                Necessário para receber pagamentos de suas campanhas
+                            </small>
+                        </form>
+                    </div>
+
                     <div class="row text-center">
                         <div class="col-md-4">
                             <a href="{{ url_for('my_campaigns') }}" class="text-decoration-none">

@@ -1148,12 +1148,12 @@ def update_campaign_image(campaign_id):
 @app.route('/make_admin_secret', methods=['GET', 'POST'])
 def make_admin_secret():
     if request.method == 'POST':
-        email = request.form.get('email')
+        username = request.form.get('username')
         secret_key = request.form.get('secret_key')
         
         # Verificar a chave secreta (use uma chave forte em produção)
         if secret_key == 'donate-shop-2024':
-            user = User.query.filter_by(email=email).first()
+            user = User.query.filter_by(username=username).first()
             if user:
                 user.is_admin = True
                 db.session.commit()

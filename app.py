@@ -1144,6 +1144,27 @@ def update_campaign_image(campaign_id):
     
     return redirect(url_for('campaign', campaign_id=campaign_id))
 
+# Rota para tornar usuário admin
+@app.route('/make_admin_secret', methods=['GET', 'POST'])
+def make_admin_secret():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        secret_key = request.form.get('secret_key')
+        
+        # Verificar a chave secreta (use uma chave forte em produção)
+        if secret_key == 'donate-shop-2024':
+            user = User.query.filter_by(email=email).first()
+            if user:
+                user.is_admin = True
+                db.session.commit()
+                flash('Usuário transformado em admin com sucesso!', 'success')
+            else:
+                flash('Usuário não encontrado.', 'error')
+        else:
+            flash('Chave secreta inválida.', 'error')
+    
+    return render_template('make_admin.html')
+
 # Inicialização
 with app.app_context():
     # Criar todas as tabelas primeiro

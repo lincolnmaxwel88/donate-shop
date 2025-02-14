@@ -1,1 +1,1 @@
-web: python init_db.py && gunicorn app:app --log-file -
+web: gunicorn -c gunicorn_config.py app:app

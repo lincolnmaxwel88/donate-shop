@@ -1144,74 +1144,86 @@ def update_campaign_image(campaign_id):
     
     return redirect(url_for('campaign', campaign_id=campaign_id))
 
+# Inicialização
+with app.app_context():
+    # Criar todas as tabelas primeiro
+    db.create_all()
+    
+    # Agora podemos verificar e modificar as tabelas
+    inspector = db.inspect(db.engine)
+    try:
+        columns = [col['name'] for col in inspector.get_columns('user')]
+        if 'pix_key' not in columns:
+            # Adicionar a coluna pix_key
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE user ADD COLUMN pix_key VARCHAR(100)'))
+                conn.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
+    
+    try:
+        columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
+        if 'next_attempt_allowed_at' not in columns:
+            # Adicionar a coluna next_attempt_allowed_at
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN next_attempt_allowed_at DATETIME'))
+                conn.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
+    
+    try:
+        columns = [col['name'] for col in inspector.get_columns('system_config')]
+        if 'min_withdrawal_percentage' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE system_config ADD COLUMN min_withdrawal_percentage FLOAT DEFAULT 10.0'))
+                conn.commit()
+        if 'next_withdrawal_minutes' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE system_config ADD COLUMN next_withdrawal_minutes INTEGER DEFAULT 1440'))
+                conn.commit()
+        if 'gateway_fee_percentage' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_percentage FLOAT DEFAULT 3.99'))
+                conn.commit()
+        if 'gateway_fee_fixed' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_fixed FLOAT DEFAULT 0.39'))
+                conn.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
+    
+    try:
+        columns = [col['name'] for col in inspector.get_columns('donation')]
+        if 'net_amount' not in columns:
+            # Adicionar a coluna net_amount
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE donation ADD COLUMN net_amount FLOAT'))
+                conn.commit()
+            
+            # Atualizar os valores existentes
+            config = SystemConfig.query.first()
+            if config:
+                donations = Donation.query.all()
+                for donation in donations:
+                    gateway_fee = (donation.amount * config.gateway_fee_percentage / 100) + config.gateway_fee_fixed
+                    donation.net_amount = donation.amount - gateway_fee
+                db.session.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
+    
+    try:
+        columns = [col['name'] for col in inspector.get_columns('campaign')]
+        if 'is_active' not in columns:
+            # Adicionar a coluna is_active
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE campaign ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
+                conn.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
+
 # Registrar filtros Jinja2
 app.jinja_env.filters['format_datetime'] = format_datetime
 app.jinja_env.filters['format_currency_br'] = format_currency_br
-
-# Inicialização
-with app.app_context():
-    # Verificar se a coluna pix_key já existe
-    inspector = db.inspect(db.engine)
-    columns = [col['name'] for col in inspector.get_columns('user')]
-    if 'pix_key' not in columns:
-        # Adicionar a coluna pix_key
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE user ADD COLUMN pix_key VARCHAR(100)'))
-            conn.commit()
-    
-    # Verificar se a coluna next_attempt_allowed_at já existe
-    columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
-    if 'next_attempt_allowed_at' not in columns:
-        # Adicionar a coluna next_attempt_allowed_at
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN next_attempt_allowed_at DATETIME'))
-            conn.commit()
-    
-    # Verificar se as colunas do SystemConfig existem
-    columns = [col['name'] for col in inspector.get_columns('system_config')]
-    if 'min_withdrawal_percentage' not in columns:
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE system_config ADD COLUMN min_withdrawal_percentage FLOAT DEFAULT 10.0'))
-            conn.commit()
-    if 'next_withdrawal_minutes' not in columns:
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE system_config ADD COLUMN next_withdrawal_minutes INTEGER DEFAULT 1440'))
-            conn.commit()
-    if 'gateway_fee_percentage' not in columns:
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_percentage FLOAT DEFAULT 3.99'))
-            conn.commit()
-    if 'gateway_fee_fixed' not in columns:
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_fixed FLOAT DEFAULT 0.39'))
-            conn.commit()
-    
-    # Verificar se a coluna net_amount já existe na tabela donation
-    columns = [col['name'] for col in inspector.get_columns('donation')]
-    if 'net_amount' not in columns:
-        # Adicionar a coluna net_amount
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE donation ADD COLUMN net_amount FLOAT'))
-            conn.commit()
-        
-        # Atualizar os valores existentes
-        config = SystemConfig.query.first()
-        if config:
-            donations = Donation.query.all()
-            for donation in donations:
-                gateway_fee = (donation.amount * config.gateway_fee_percentage / 100) + config.gateway_fee_fixed
-                donation.net_amount = donation.amount - gateway_fee
-            db.session.commit()
-    
-    # Verificar se a coluna is_active já existe na tabela campaign
-    columns = [col['name'] for col in inspector.get_columns('campaign')]
-    if 'is_active' not in columns:
-        # Adicionar a coluna is_active
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE campaign ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
-            conn.commit()
-    
-    db.create_all()
 
 if __name__ == '__main__':
     app.run(debug=True)

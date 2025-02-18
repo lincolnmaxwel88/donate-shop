@@ -5,7 +5,8 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-body">
-                <h2 class="card-title text-center mb-4">Login</h2>
+                <h2 class="card-title text-center mb-4">Bem-vindo de volta!</h2>
+                <p class="text-center text-muted mb-4">Continue ajudando a realizar sonhos</p>
                 <form method="POST">
                     <div class="mb-3">
                         <label for="username" class="form-label">Usuário</label>
@@ -19,9 +20,9 @@
                         <button type="submit" class="btn btn-primary">Entrar</button>
                     </div>
                 </form>
-                <div class="text-center mt-3">
-                    <p>Não tem uma conta? <a href="{{ url_for('register') }}">Registre-se</a></p>
-                </div>
+                <p class="text-center mt-3">
+                    Ainda não tem uma conta? <a href="{{ url_for('register') }}">Cadastre-se</a>
+                </p>
             </div>
         </div>
     </div>

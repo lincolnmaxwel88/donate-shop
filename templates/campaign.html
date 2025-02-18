@@ -175,6 +175,31 @@
     transform: translateY(-2px);
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
+
+.comments-list {
+    margin-top: 20px;
+}
+
+.comment {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.comment-header {
+    margin-bottom: 8px;
+}
+
+.comment-content {
+    color: #4a5568;
+    line-height: 1.5;
+}
+
+.comment img.rounded-circle {
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 </style>
 {% endblock %}
 
@@ -497,11 +522,17 @@
                     <div class="comments-list">
                         {% for comment in campaign.comments|sort(attribute='created_at', reverse=true) %}
                             <div class="comment">
-                                <div class="comment-header">
-                                    <strong>{{ comment.author.username }}</strong>
-                                    <small class="text-muted">{{ comment.created_at|format_datetime }}</small>
+                                <div class="comment-header d-flex align-items-center">
+                                    <img src="{{ url_for('static', filename=comment.author.profile_image) if comment.author.profile_image else url_for('static', filename='images/default-avatar.png') }}" 
+                                         alt="{{ comment.author.username }}" 
+                                         class="rounded-circle me-2"
+                                         style="width: 32px; height: 32px; object-fit: cover;">
+                                    <div>
+                                        <strong>{{ comment.author.username }}</strong>
+                                        <small class="text-muted d-block">{{ comment.created_at|format_datetime }}</small>
+                                    </div>
                                 </div>
-                                <div class="comment-content">
+                                <div class="comment-content mt-2">
                                     {{ comment.content }}
                                 </div>
                             </div>

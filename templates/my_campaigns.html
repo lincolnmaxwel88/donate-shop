@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Minhas Campanhas{% endblock %}
+{% block title %}Meus Sonhos{% endblock %}
 
 {% block content %}
 <div class="container">
-    <h2 class="mb-4">Minhas Campanhas</h2>
+    <h2 class="mb-4">Meus Sonhos Compartilhados</h2>
     
     {% if campaigns %}
         {% for campaign in campaigns %}
@@ -22,45 +22,30 @@
                                  aria-valuenow="{{ campaign.progress_percentage }}" 
                                  aria-valuemin="0" 
                                  aria-valuemax="100">
-                                {{ "%.1f"|format(campaign.progress_percentage) }}%
+                                {{ campaign.progress_percentage }}%
                             </div>
                         </div>
                         
                         <!-- Stats -->
                         <div class="row mb-3">
-                            <div class="col-md-4">
-                                <small class="text-muted">Meta:</small>
-                                <br>
-                                <strong>{{ campaign.goal|format_currency_br }}</strong>
+                            <div class="col">
+                                <small class="text-muted">Meta: {{ campaign.goal|format_currency_br }}</small>
                             </div>
-                            <div class="col-md-4">
-                                <small class="text-muted">Arrecadado:</small>
-                                <br>
-                                <strong>{{ campaign.total_donated|format_currency_br }}</strong>
-                            </div>
-                            <div class="col-md-4">
-                                <small class="text-muted">Disponível:</small>
-                                <br>
-                                <strong>{{ campaign.available_for_withdrawal|format_currency_br }}</strong>
+                            <div class="col text-end">
+                                <small class="text-muted">Arrecadado: {{ campaign.total_donated|format_currency_br }}</small>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="col-md-4">
-                        <!-- Actions -->
-                        <div class="d-grid gap-2">
-                            <a href="{{ url_for('campaign', campaign_id=campaign.id) }}" 
-                               class="btn btn-primary">Ver Campanha</a>
-                            
-                            {% if campaign.available_for_withdrawal >= 50 %}
-                            <form action="{{ url_for('request_withdrawal', campaign_id=campaign.id) }}" 
-                                  method="post">
-                                <button type="submit" class="btn btn-success w-100">
-                                    Solicitar Retirada
-                                </button>
-                            </form>
-                            {% endif %}
+                    <div class="col-md-4 text-md-end">
+                        <a href="{{ url_for('campaign', campaign_id=campaign.id) }}" class="btn btn-primary mb-2">
+                            <i class="fas fa-eye"></i> Ver Detalhes
+                        </a>
+                        {% if not campaign.is_active %}
+                        <div class="alert alert-warning mt-2">
+                            <i class="fas fa-exclamation-triangle"></i> Campanha Encerrada
                         </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -68,9 +53,17 @@
         {% endfor %}
     {% else %}
         <div class="alert alert-info">
-            <p>Você ainda não tem campanhas. Que tal criar uma agora?</p>
+            <p>Você ainda não compartilhou nenhum sonho.</p>
+            <a href="{{ url_for('new_campaign') }}" class="btn btn-primary mt-2">
+                <i class="fas fa-plus"></i> Compartilhar Meu Sonho
+            </a>
+        </div>
+    {% endif %}
+    
+    {% if campaigns %}
+        <div class="text-center mt-4">
             <a href="{{ url_for('new_campaign') }}" class="btn btn-primary">
-                Criar Campanha
+                <i class="fas fa-plus"></i> Compartilhar Novo Sonho
             </a>
         </div>
     {% endif %}

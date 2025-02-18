@@ -5,15 +5,17 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-body">
-                <h2 class="card-title text-center mb-4">Criar Nova Campanha</h2>
+                <h2 class="card-title text-center mb-4">Compartilhe Seu Sonho</h2>
+                <p class="text-center text-muted mb-4">Conte sua história e inspire pessoas a ajudarem você a realizar seu sonho</p>
                 <form method="POST" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label for="title" class="form-label">Nome da campanha</label>
-                        <input type="text" class="form-control" id="title" name="title" required>
+                        <label for="title" class="form-label">Qual é o seu sonho?</label>
+                        <input type="text" class="form-control" id="title" name="title" required placeholder="Ex: Realizar meu sonho de estudar medicina">
                     </div>
                     <div class="mb-3">
-                        <label for="description" class="form-label">Descrição</label>
-                        <textarea class="form-control" id="description" name="description" rows="5" required></textarea>
+                        <label for="description" class="form-label">Conte sua história</label>
+                        <textarea class="form-control" id="description" name="description" rows="5" required 
+                                placeholder="Compartilhe sua história, motivação e como esse sonho vai impactar sua vida..."></textarea>
                         <div class="emoji-picker mt-2">
                             <div class="d-flex flex-wrap gap-2">
                                 <button type="button" class="btn btn-light emoji-btn" data-emoji="❤️">❤️</button>
@@ -50,7 +52,7 @@
                         <small class="text-muted">Formatos aceitos: PNG, JPG, JPEG, GIF</small>
                     </div>
                     <div class="text-center">
-                        <button type="submit" class="btn btn-primary">Criar Campanha</button>
+                        <button type="submit" class="btn btn-primary">Compartilhar Sonho</button>
                     </div>
                 </form>
             </div>

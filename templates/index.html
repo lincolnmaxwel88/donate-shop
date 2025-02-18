@@ -11,12 +11,12 @@
     <!-- Hero Section -->
     <div class="hero-section text-center">
         <div class="container">
-            <h1 class="display-4">Faça a Diferença Hoje</h1>
-            <p class="lead">Junte-se a nossa comunidade de doadores e ajude a transformar vidas</p>
+            <h1 class="display-4">Realize Sonhos Hoje</h1>
+            <p class="lead">Junte-se a nossa comunidade e ajude a transformar sonhos em realidade</p>
             {% if current_user.is_authenticated %}
                 <a href="{{ url_for('new_campaign') }}" class="btn btn-light btn-lg">Criar Campanha</a>
             {% else %}
-                <a href="{{ url_for('register') }}" class="btn btn-light btn-lg">Começar a Doar</a>
+                <a href="{{ url_for('register') }}" class="btn btn-light btn-lg">Realizar Sonhos</a>
             {% endif %}
         </div>
     </div>

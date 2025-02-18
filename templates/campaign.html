@@ -297,47 +297,59 @@
                                 {% endif %}
                             </div>
                         {% elif campaign.available_for_withdrawal > 0 %}
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#withdrawalModal">
-                                <i class="fas fa-money-bill-wave"></i> Solicitar Retirada
-                            </button>
+                            {% if current_user.pix_key %}
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#withdrawalModal">
+                                    <i class="fas fa-money-bill-wave"></i> Solicitar Retirada
+                                </button>
 
-                            <!-- Modal de Retirada -->
-                            <div class="modal fade" id="withdrawalModal" tabindex="-1">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <form action="{{ url_for('request_withdrawal', campaign_id=campaign.id) }}" method="POST">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title">Solicitar Retirada</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="alert alert-warning">
-                                                    <i class="fas fa-exclamation-triangle"></i>
-                                                    <strong>Atenção!</strong> 
-                                                    <ul class="mb-0">
-                                                        <li>Ao solicitar a retirada, sua campanha será automaticamente encerrada e não poderá mais receber doações.</li>
-                                                        <li>Você só pode solicitar retirada uma única vez.</li>
-                                                    </ul>
+                                <!-- Modal de Retirada -->
+                                <div class="modal fade" id="withdrawalModal" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form action="{{ url_for('request_withdrawal', campaign_id=campaign.id) }}" method="POST">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Solicitar Retirada</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                 </div>
-                                                <p>Valor disponível para retirada: <strong>{{ campaign.available_for_withdrawal|format_currency_br }}</strong></p>
-                                                <p>Taxa de retirada: <strong>{{ withdrawal_fee }}%</strong></p>
-                                                <p>Valor líquido estimado: <strong>{{ (campaign.available_for_withdrawal * (1 - withdrawal_fee/100))|format_currency_br }}</strong></p>
-                                                
-                                                <div class="form-check mb-3">
-                                                    <input class="form-check-input" type="checkbox" id="confirmWithdrawal" required>
-                                                    <label class="form-check-label" for="confirmWithdrawal">
-                                                        Eu entendo que ao solicitar a retirada, minha campanha será encerrada e não poderei mais receber doações.
-                                                    </label>
+                                                <div class="modal-body">
+                                                    <div class="alert alert-warning">
+                                                        <i class="fas fa-exclamation-triangle"></i>
+                                                        <strong>Atenção!</strong> 
+                                                        <ul class="mb-0">
+                                                            <li>Ao solicitar a retirada, sua campanha será automaticamente encerrada e não poderá mais receber doações.</li>
+                                                            <li>Você só pode solicitar retirada uma única vez.</li>
+                                                        </ul>
+                                                    </div>
+                                                    <p>Valor disponível para retirada: <strong>{{ campaign.available_for_withdrawal|format_currency_br }}</strong></p>
+                                                    <p>Taxa de retirada: <strong>{{ withdrawal_fee }}%</strong></p>
+                                                    <p>Valor líquido estimado: <strong>{{ (campaign.available_for_withdrawal * (1 - withdrawal_fee/100))|format_currency_br }}</strong></p>
+                                                    <p>Chave PIX para recebimento: <strong>{{ current_user.pix_key }}</strong></p>
+                                                    
+                                                    <div class="form-check mb-3">
+                                                        <input class="form-check-input" type="checkbox" id="confirmWithdrawal" required>
+                                                        <label class="form-check-label" for="confirmWithdrawal">
+                                                            Eu entendo que ao solicitar a retirada, minha campanha será encerrada e não poderei mais receber doações.
+                                                        </label>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                <button type="submit" class="btn btn-primary">Confirmar Retirada</button>
-                                            </div>
-                                        </form>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-primary">Confirmar Retirada</button>
+                                                </div>
+                                            </form>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <strong>Atenção!</strong>
+                                    <p>Para solicitar uma retirada, você precisa cadastrar uma chave PIX no seu perfil.</p>
+                                    <a href="{{ url_for('profile') }}" class="btn btn-primary mt-2">
+                                        <i class="fas fa-user"></i> Ir para Perfil
+                                    </a>
+                                </div>
+                            {% endif %}
                         {% else %}
                             <div class="alert alert-warning">
                                 <i class="fas fa-exclamation-triangle"></i>

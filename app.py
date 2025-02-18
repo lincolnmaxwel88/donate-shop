@@ -169,6 +169,7 @@ class WithdrawalRequest(db.Model):
     processed_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     notes = db.Column(db.Text)
     next_attempt_allowed_at = db.Column(db.DateTime, nullable=True)
+    pix_key = db.Column(db.String(100), nullable=True)  # Nova coluna
 
 class SystemConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -803,11 +804,17 @@ def donation_history(campaign_id):
 def request_withdrawal(campaign_id):
     campaign = Campaign.query.get_or_404(campaign_id)
     
+    # Verificar se o usuário é o dono da campanha
     if campaign.user_id != current_user.id:
         flash('Você não tem permissão para solicitar retirada desta campanha.', 'error')
-        return redirect(url_for('manage_withdrawals'))
+        return redirect(url_for('campaign', campaign_id=campaign_id))
     
-    # Verifica se já existe uma retirada pendente
+    # Verificar se o usuário tem chave PIX cadastrada
+    if not current_user.pix_key:
+        flash('Você precisa cadastrar uma chave PIX antes de solicitar uma retirada.', 'error')
+        return redirect(url_for('profile'))
+    
+    # Verificar se já existe uma solicitação pendente
     pending_withdrawal = WithdrawalRequest.query.filter_by(
         campaign_id=campaign_id,
         status='pending'
@@ -815,66 +822,49 @@ def request_withdrawal(campaign_id):
     
     if pending_withdrawal:
         flash('Já existe uma solicitação de retirada pendente para esta campanha.', 'error')
-        return redirect(url_for('manage_withdrawals'))
+        return redirect(url_for('campaign', campaign_id=campaign_id))
+    
+    # Verificar se há valor disponível para retirada
+    if campaign.available_for_withdrawal <= 0:
+        flash('Não há valor disponível para retirada.', 'error')
+        return redirect(url_for('campaign', campaign_id=campaign_id))
     
     try:
-        # Calcula o valor disponível para retirada
-        available = campaign.available_for_withdrawal
-        
-        # Verifica se há configurações no sistema
+        # Buscar configurações do sistema
         config = SystemConfig.query.first()
-        min_percentage = config.min_withdrawal_percentage if config else 10.0
         withdrawal_fee = config.withdrawal_fee if config else 5.0
         
-        # Calcula o valor mínimo baseado na meta da campanha
-        min_withdrawal = (campaign.goal * min_percentage / 100)
-
-        if available < min_withdrawal:
-            flash(f'Valor mínimo para retirada é {format_currency_br(min_withdrawal)} ({min_percentage}% da meta de {format_currency_br(campaign.goal)})', 'error')
-            return redirect(url_for('manage_withdrawals'))
-        
-        # Verifica o tempo desde a última retirada rejeitada
-        last_rejected = WithdrawalRequest.query.filter_by(
-            campaign_id=campaign_id,
-            status='rejected'
-        ).order_by(WithdrawalRequest.created_at.desc()).first()
-        
-        if last_rejected and last_rejected.next_attempt_allowed_at:
-            if datetime.utcnow() < last_rejected.next_attempt_allowed_at:
-                waiting_minutes = int((last_rejected.next_attempt_allowed_at - datetime.utcnow()).total_seconds() / 60)
-                flash(f'Aguarde {waiting_minutes // 60}h{waiting_minutes % 60}min para solicitar nova retirada.', 'error')
-                return redirect(url_for('manage_withdrawals'))
-        
-        # Cria a solicitação de retirada
+        # Criar solicitação de retirada
         withdrawal = WithdrawalRequest(
-            amount=available,
-            fee_percentage=withdrawal_fee,
-            net_amount=available * (1 - withdrawal_fee/100),
             campaign_id=campaign_id,
             user_id=current_user.id,
-            status='pending'
+            amount=campaign.available_for_withdrawal,
+            fee_percentage=withdrawal_fee,
+            net_amount=campaign.available_for_withdrawal * (1 - withdrawal_fee/100),
+            status='pending',
+            pix_key=current_user.pix_key
         )
         
-        # Desativa a campanha temporariamente
+        # Desativar a campanha
         campaign.is_active = False
         campaign.end_date = datetime.utcnow()
         
         db.session.add(withdrawal)
         db.session.commit()
         
-        flash('Solicitação de retirada enviada com sucesso! A campanha foi temporariamente desativada.', 'success')
+        flash('Solicitação de retirada enviada com sucesso! Em breve entraremos em contato.', 'success')
+        
     except Exception as e:
         db.session.rollback()
-        flash('Erro ao solicitar retirada. Por favor, tente novamente.', 'error')
+        flash('Erro ao processar a solicitação de retirada. Por favor, tente novamente.', 'error')
         app.logger.error(f'Erro ao solicitar retirada: {str(e)}')
     
-    return redirect(url_for('manage_withdrawals'))
+    return redirect(url_for('campaign', campaign_id=campaign_id))
 
 @app.route('/admin/withdrawals')
 @login_required
 @admin_required
 def admin_withdrawals():
-    # Busca todas as retiradas, ordenadas por data de criação (mais recentes primeiro)
     withdrawals = WithdrawalRequest.query.order_by(WithdrawalRequest.created_at.desc()).all()
     return render_template('admin/withdrawals.html', withdrawals=withdrawals)
 
@@ -889,12 +879,10 @@ def approve_withdrawal(withdrawal_id):
         return redirect(url_for('admin_withdrawals'))
     
     try:
-        # Atualiza o status da retirada
         withdrawal.status = 'approved'
         withdrawal.processed_at = datetime.utcnow()
         withdrawal.processed_by_id = current_user.id
         
-        # Mantém a campanha desativada
         campaign = withdrawal.campaign
         campaign.is_active = False
         campaign.end_date = datetime.utcnow()
@@ -924,18 +912,15 @@ def reject_withdrawal(withdrawal_id):
         return redirect(url_for('admin_withdrawals'))
     
     try:
-        # Atualiza o status da retirada
         withdrawal.status = 'rejected'
         withdrawal.processed_at = datetime.utcnow()
         withdrawal.processed_by_id = current_user.id
         withdrawal.notes = notes
         
-        # Reativa a campanha
         campaign = withdrawal.campaign
         campaign.is_active = True
-        campaign.end_date = None  # Remove a data de encerramento
+        campaign.end_date = None
         
-        # Define o tempo para próxima tentativa
         config = SystemConfig.query.first()
         next_withdrawal_minutes = config.next_withdrawal_minutes if config else 1440
         withdrawal.next_attempt_allowed_at = datetime.utcnow() + timedelta(minutes=next_withdrawal_minutes)
@@ -1049,7 +1034,6 @@ def admin_settings():
             config.gateway_fee_percentage = float(request.form.get('gateway_fee_percentage', 3.99))
             config.gateway_fee_fixed = float(request.form.get('gateway_fee_fixed', 0.39))
             
-            # Calcula o total de minutos baseado em dias, horas e minutos
             days = int(request.form.get('days', 0))
             hours = int(request.form.get('hours', 0))
             minutes = int(request.form.get('minutes', 0))
@@ -1072,7 +1056,6 @@ def admin_settings():
 @app.route('/manage_withdrawals')
 @login_required
 def manage_withdrawals():
-    # Busca as campanhas do usuário
     campaigns = Campaign.query.filter_by(user_id=current_user.id).all()
     config = SystemConfig.query.first()
     withdrawal_fee = config.withdrawal_fee if config else 5.0
@@ -1080,12 +1063,10 @@ def manage_withdrawals():
     
     campaigns_data = []
     for campaign in campaigns:
-        # Calcula valores para cada campanha
         total_net = campaign.total_net
         withdrawn = campaign.total_withdrawn
         available = campaign.available_for_withdrawal
         
-        # Calcula o valor mínimo baseado na meta da campanha
         min_withdrawal = (campaign.goal * min_percentage / 100)
         
         campaigns_data.append({
@@ -1151,7 +1132,6 @@ def make_admin_secret():
         username = request.form.get('username')
         secret_key = request.form.get('secret_key')
         
-        # Verificar a chave secreta (use uma chave forte em produção)
         if secret_key == 'donate-shop-2024':
             user = User.query.filter_by(username=username).first()
             if user:
@@ -1167,15 +1147,21 @@ def make_admin_secret():
 
 # Inicialização
 with app.app_context():
-    # Criar todas as tabelas primeiro
     db.create_all()
     
-    # Agora podemos verificar e modificar as tabelas
     inspector = db.inspect(db.engine)
+    try:
+        columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
+        if 'pix_key' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN pix_key VARCHAR(100)'))
+                conn.commit()
+    except Exception as e:
+        print(f"Erro ao verificar/adicionar coluna pix_key: {e}")
+
     try:
         columns = [col['name'] for col in inspector.get_columns('user')]
         if 'pix_key' not in columns:
-            # Adicionar a coluna pix_key
             with db.engine.connect() as conn:
                 conn.execute(text('ALTER TABLE user ADD COLUMN pix_key VARCHAR(100)'))
                 conn.commit()
@@ -1185,7 +1171,6 @@ with app.app_context():
     try:
         columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
         if 'next_attempt_allowed_at' not in columns:
-            # Adicionar a coluna next_attempt_allowed_at
             with db.engine.connect() as conn:
                 conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN next_attempt_allowed_at DATETIME'))
                 conn.commit()
@@ -1216,12 +1201,10 @@ with app.app_context():
     try:
         columns = [col['name'] for col in inspector.get_columns('donation')]
         if 'net_amount' not in columns:
-            # Adicionar a coluna net_amount
             with db.engine.connect() as conn:
                 conn.execute(text('ALTER TABLE donation ADD COLUMN net_amount FLOAT'))
                 conn.commit()
             
-            # Atualizar os valores existentes
             config = SystemConfig.query.first()
             if config:
                 donations = Donation.query.all()
@@ -1235,7 +1218,6 @@ with app.app_context():
     try:
         columns = [col['name'] for col in inspector.get_columns('campaign')]
         if 'is_active' not in columns:
-            # Adicionar a coluna is_active
             with db.engine.connect() as conn:
                 conn.execute(text('ALTER TABLE campaign ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
                 conn.commit()

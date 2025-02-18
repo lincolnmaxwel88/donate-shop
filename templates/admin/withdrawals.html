@@ -10,6 +10,8 @@
                 <tr>
                     <th>Data</th>
                     <th>Campanha</th>
+                    <th>Usuário</th>
+                    <th>Chave PIX</th>
                     <th>Valor Bruto</th>
                     <th>Taxa</th>
                     <th>Valor Líquido</th>
@@ -22,6 +24,15 @@
                 <tr>
                     <td>{{ withdrawal.created_at|format_datetime }}</td>
                     <td>{{ withdrawal.campaign.title }}</td>
+                    <td>{{ withdrawal.campaign.user.username }}</td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <span class="text-monospace">{{ withdrawal.pix_key }}</span>
+                            <button class="btn btn-sm btn-link ms-2 copy-btn" data-clipboard-text="{{ withdrawal.pix_key }}" title="Copiar chave PIX">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </td>
                     <td>{{ withdrawal.amount|format_currency_br }}</td>
                     <td>{{ withdrawal.fee_percentage }}%</td>
                     <td>{{ withdrawal.net_amount|format_currency_br }}</td>
@@ -87,4 +98,22 @@
         </table>
     </div>
 </div>
+
+<!-- Adicionar clipboard.js para o botão de cópia -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.8/clipboard.min.js"></script>
+<script>
+    // Inicializar clipboard.js
+    new ClipboardJS('.copy-btn');
+    
+    // Adicionar tooltip de feedback
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const originalTitle = btn.getAttribute('title');
+            btn.setAttribute('title', 'Copiado!');
+            setTimeout(() => {
+                btn.setAttribute('title', originalTitle);
+            }, 1000);
+        });
+    });
+</script>
 {% endblock %}

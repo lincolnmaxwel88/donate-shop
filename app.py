@@ -833,6 +833,15 @@ def request_withdrawal(campaign_id):
         # Buscar configurações do sistema
         config = SystemConfig.query.first()
         withdrawal_fee = config.withdrawal_fee if config else 5.0
+        min_withdrawal_percentage = config.min_withdrawal_percentage if config else 10.0
+        
+        # Calcular valor mínimo baseado na porcentagem da meta
+        min_withdrawal_amount = campaign.goal * (min_withdrawal_percentage / 100) if campaign.goal else 0
+        
+        # Verificar se atinge o valor mínimo
+        if campaign.available_for_withdrawal < min_withdrawal_amount:
+            flash(f'O valor disponível para retirada ({format_currency_br(campaign.available_for_withdrawal)}) é menor que o mínimo necessário ({format_currency_br(min_withdrawal_amount)} - {min_withdrawal_percentage}% da meta).', 'error')
+            return redirect(url_for('campaign', campaign_id=campaign_id))
         
         # Criar solicitação de retirada
         withdrawal = WithdrawalRequest(

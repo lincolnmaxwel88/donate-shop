@@ -15,6 +15,7 @@ from flask_mail import Mail, Message
 from config import Config
 from sqlalchemy import text
 from sqlalchemy import func
+import secrets
 
 # Configuração do Stripe
 stripe.api_key = 'sk_test_51QbVcLKxtlwVKoGi0AuzhFm6FmgCDnwZPmMZMCKYuBmex3wb4N9yIcOTubCJb9GGpF37zBnX1YZqeo7fd68GGyHX00j2yH2KeX'
@@ -55,6 +56,9 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
     profile_image = db.Column(db.String(100))
     pix_key = db.Column(db.String(100), nullable=True)
+    email_confirmed = db.Column(db.Boolean, default=False)
+    confirmation_token = db.Column(db.String(100), unique=True, nullable=True)
+    confirmation_token_created_at = db.Column(db.DateTime, nullable=True)
     campaigns = db.relationship('Campaign', backref='user', lazy=True)
     donations = db.relationship('Donation', backref='donor', lazy=True)
     likes = db.relationship('Like', backref='user', lazy=True)
@@ -244,6 +248,39 @@ def get_waiting_time_for_withdrawal(campaign):
             return int(next_withdrawal_minutes - (time_since_reject.total_seconds() / 60))
     
     return None
+
+def generate_confirmation_token():
+    return secrets.token_urlsafe(32)
+
+def send_confirmation_email(user):
+    token = generate_confirmation_token()
+    user.confirmation_token = token
+    user.confirmation_token_created_at = datetime.utcnow()
+    db.session.commit()
+    
+    confirmation_url = url_for('confirm_email', token=token, _external=True)
+    
+    msg = Message('Confirme seu email - Donate Shop',
+                  sender=app.config['MAIL_DEFAULT_SENDER'],
+                  recipients=[user.email])
+    
+    msg.html = render_template('email/confirm_email.html',
+                             user=user,
+                             confirmation_url=confirmation_url)
+    
+    mail.send(msg)
+
+def is_token_valid(token):
+    user = User.query.filter_by(confirmation_token=token).first()
+    if not user:
+        return None
+        
+    # Token expira em 24 horas
+    expiration = user.confirmation_token_created_at + timedelta(hours=24)
+    if datetime.utcnow() > expiration:
+        return None
+        
+    return user
 
 # Rotas
 @app.route('/')
@@ -445,29 +482,40 @@ def toggle_block(user_id):
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
     if request.method == 'POST':
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
         
-        user = User.query.filter_by(username=username).first()
-        if user:
-            flash('Nome de usuário já existe', 'error')
+        if User.query.filter_by(username=username).first():
+            flash('Nome de usuário já está em uso.', 'error')
             return redirect(url_for('register'))
             
-        user = User.query.filter_by(email=email).first()
-        if user:
-            flash('Email já está em uso', 'error')
+        if User.query.filter_by(email=email).first():
+            flash('Email já está em uso.', 'error')
             return redirect(url_for('register'))
+        
+        user = User(username=username, email=email)
+        user.set_password(password)
+        
+        try:
+            db.session.add(user)
+            db.session.commit()
             
-        new_user = User(username=username, email=email)
-        new_user.password_hash = generate_password_hash(password)
-        
-        db.session.add(new_user)
-        db.session.commit()
-        
-        flash('Cadastro realizado com sucesso!', 'success')
-        return redirect(url_for('login'))
+            # Enviar email de confirmação
+            send_confirmation_email(user)
+            
+            flash('Cadastro realizado com sucesso! Por favor, verifique seu email para confirmar sua conta.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f'Erro ao registrar usuário: {str(e)}')
+            flash('Erro ao realizar cadastro. Por favor, tente novamente.', 'error')
+            return redirect(url_for('register'))
     
     return render_template('register.html')
 
@@ -1153,6 +1201,37 @@ def make_admin_secret():
             flash('Chave secreta inválida.', 'error')
     
     return render_template('make_admin.html')
+
+@app.route('/confirm_email/<token>')
+def confirm_email(token):
+    user = is_token_valid(token)
+    if not user:
+        flash('O link de confirmação é inválido ou expirou.', 'error')
+        return redirect(url_for('login'))
+    
+    user.email_confirmed = True
+    user.confirmation_token = None
+    user.confirmation_token_created_at = None
+    db.session.commit()
+    
+    flash('Email confirmado com sucesso! Agora você pode fazer login.', 'success')
+    return redirect(url_for('login'))
+
+@app.route('/resend_confirmation')
+@login_required
+def resend_confirmation():
+    if current_user.email_confirmed:
+        flash('Seu email já está confirmado!', 'info')
+        return redirect(url_for('profile'))
+    
+    try:
+        send_confirmation_email(current_user)
+        flash('Um novo email de confirmação foi enviado. Por favor, verifique sua caixa de entrada.', 'success')
+    except Exception as e:
+        app.logger.error(f'Erro ao enviar email de confirmação: {str(e)}')
+        flash('Erro ao enviar email de confirmação. Por favor, tente novamente.', 'error')
+    
+    return redirect(url_for('profile'))
 
 # Inicialização
 with app.app_context():

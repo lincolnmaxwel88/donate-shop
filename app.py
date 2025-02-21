@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_migrate import Migrate
+from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import os
@@ -11,11 +12,12 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 import time
 import stripe
-from flask_mail import Mail, Message
+import logging
+from PIL import Image
+import secrets
 from config import Config
 from sqlalchemy import text
 from sqlalchemy import func
-import secrets
 
 # Configuração do Stripe
 stripe.api_key = 'sk_test_51QbVcLKxtlwVKoGi0AuzhFm6FmgCDnwZPmMZMCKYuBmex3wb4N9yIcOTubCJb9GGpF37zBnX1YZqeo7fd68GGyHX00j2yH2KeX'
@@ -23,27 +25,27 @@ STRIPE_PUBLIC_KEY = 'pk_test_51QbVcLKxtlwVKoGi1mssIKeOby7ZtYayRV9ZdE9aXJkbeK00RK
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+
+# Inicializar extensões
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+mail = Mail(app)
+
+# Configurar o upload de arquivos
+UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///donate.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
-
-# Cria a pasta de uploads se não existir
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
-
-# Configuração do banco de dados
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-
-# Configuração do login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-# Configuração do email
-mail = Mail(app)
 
 # Modelos
 class User(UserMixin, db.Model):
@@ -59,20 +61,30 @@ class User(UserMixin, db.Model):
     email_confirmed = db.Column(db.Boolean, default=False)
     confirmation_token = db.Column(db.String(100), unique=True, nullable=True)
     confirmation_token_created_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relacionamentos
     campaigns = db.relationship('Campaign', backref='user', lazy=True)
     donations = db.relationship('Donation', backref='donor', lazy=True)
     likes = db.relationship('Like', backref='user', lazy=True)
     comments = db.relationship('Comment', backref='author', lazy=True)
     campaign_views = db.relationship('CampaignView', backref='user', lazy=True)
+    
     # Relações para WithdrawalRequest
     requested_withdrawals = db.relationship('WithdrawalRequest',
                                           foreign_keys='WithdrawalRequest.user_id',
                                           backref='requester',
                                           lazy=True)
+                                          
     processed_withdrawals = db.relationship('WithdrawalRequest',
                                           foreign_keys='WithdrawalRequest.processed_by_id',
                                           backref='processor',
                                           lazy=True)
+                                          
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+        
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 class Campaign(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -486,34 +498,49 @@ def register():
         return redirect(url_for('index'))
         
     if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        
-        if User.query.filter_by(username=username).first():
-            flash('Nome de usuário já está em uso.', 'error')
-            return redirect(url_for('register'))
-            
-        if User.query.filter_by(email=email).first():
-            flash('Email já está em uso.', 'error')
-            return redirect(url_for('register'))
-        
-        user = User(username=username, email=email)
-        user.set_password(password)
-        
         try:
+            username = request.form.get('username')
+            email = request.form.get('email')
+            password = request.form.get('password')
+            
+            app.logger.info(f"Tentativa de registro para usuário: {username}, email: {email}")
+            
+            if User.query.filter_by(username=username).first():
+                flash('Nome de usuário já está em uso.', 'error')
+                return redirect(url_for('register'))
+                
+            if User.query.filter_by(email=email).first():
+                flash('Email já está em uso.', 'error')
+                return redirect(url_for('register'))
+            
+            user = User(username=username, email=email)
+            user.set_password(password)
+            
+            app.logger.info("Usuário criado, tentando salvar no banco...")
+            
             db.session.add(user)
             db.session.commit()
             
-            # Enviar email de confirmação
-            send_confirmation_email(user)
+            app.logger.info("Usuário salvo com sucesso, tentando enviar email...")
+            
+            try:
+                # Verificar configurações de email
+                app.logger.info(f"Configurações de email: SERVER={app.config.get('MAIL_SERVER')}, PORT={app.config.get('MAIL_PORT')}, USERNAME={app.config.get('MAIL_USERNAME')}")
+                
+                send_confirmation_email(user)
+                app.logger.info("Email de confirmação enviado com sucesso")
+            except Exception as mail_error:
+                app.logger.error(f"Erro ao enviar email: {str(mail_error)}")
+                # Não vamos impedir o registro se o email falhar
+                flash('Cadastro realizado, mas houve um erro ao enviar o email de confirmação. Entre em contato com o suporte.', 'warning')
+                return redirect(url_for('login'))
             
             flash('Cadastro realizado com sucesso! Por favor, verifique seu email para confirmar sua conta.', 'success')
             return redirect(url_for('login'))
             
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f'Erro ao registrar usuário: {str(e)}')
+            app.logger.error(f"Erro completo no registro: {str(e)}", exc_info=True)
             flash('Erro ao realizar cadastro. Por favor, tente novamente.', 'error')
             return redirect(url_for('register'))
     
@@ -529,7 +556,7 @@ def login():
         password = request.form.get('password')
         user = User.query.filter_by(username=username).first()
         
-        if user and check_password_hash(user.password_hash, password):
+        if user and user.check_password(password):
             if user.is_blocked:
                 flash('Sua conta está bloqueada. Entre em contato com o administrador.', 'error')
                 return redirect(url_for('login'))

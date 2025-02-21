@@ -8,7 +8,7 @@ class Config:
     
     # Configurações do banco de dados
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///donate_shop.db')
-    if DATABASE_URL.startswith("postgres://"):
+    if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False

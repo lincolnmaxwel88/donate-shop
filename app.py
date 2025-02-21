@@ -265,34 +265,37 @@ def generate_confirmation_token():
     return secrets.token_urlsafe(32)
 
 def send_confirmation_email(user):
-    token = generate_confirmation_token()
-    user.confirmation_token = token
-    user.confirmation_token_created_at = datetime.utcnow()
-    db.session.commit()
-    
-    confirmation_url = url_for('confirm_email', token=token, _external=True)
-    
-    msg = Message('Confirme seu email - Donate Shop',
-                  sender=app.config['MAIL_DEFAULT_SENDER'],
-                  recipients=[user.email])
-    
-    msg.html = render_template('email/confirm_email.html',
-                             user=user,
-                             confirmation_url=confirmation_url)
-    
-    mail.send(msg)
-
-def is_token_valid(token):
-    user = User.query.filter_by(confirmation_token=token).first()
-    if not user:
-        return None
+    try:
+        token = generate_confirmation_token()
+        user.confirmation_token = token
+        user.confirmation_token_created_at = datetime.utcnow()
+        db.session.commit()
         
-    # Token expira em 24 horas
-    expiration = user.confirmation_token_created_at + timedelta(hours=24)
-    if datetime.utcnow() > expiration:
-        return None
+        confirmation_url = url_for('confirm_email', token=token, _external=True)
         
-    return user
+        app.logger.info(f"Preparando para enviar email para {user.email}")
+        app.logger.info(f"Configurações de email atuais:")
+        app.logger.info(f"MAIL_SERVER: {app.config.get('MAIL_SERVER')}")
+        app.logger.info(f"MAIL_PORT: {app.config.get('MAIL_PORT')}")
+        app.logger.info(f"MAIL_USE_TLS: {app.config.get('MAIL_USE_TLS')}")
+        app.logger.info(f"MAIL_USERNAME: {app.config.get('MAIL_USERNAME')}")
+        app.logger.info(f"MAIL_DEFAULT_SENDER: {app.config.get('MAIL_DEFAULT_SENDER')}")
+        
+        msg = Message('Confirme seu email - Donate Shop',
+                    sender=app.config.get('MAIL_DEFAULT_SENDER'),
+                    recipients=[user.email])
+        
+        msg.html = render_template('email/confirm_email.html',
+                                user=user,
+                                confirmation_url=confirmation_url)
+        
+        app.logger.info("Tentando enviar email...")
+        mail.send(msg)
+        app.logger.info("Email enviado com sucesso!")
+        
+    except Exception as e:
+        app.logger.error(f"Erro detalhado ao enviar email: {str(e)}", exc_info=True)
+        raise
 
 # Rotas
 @app.route('/')

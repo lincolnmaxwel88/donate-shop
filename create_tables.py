@@ -123,42 +123,6 @@ BEGIN
 END $$;
 """
 
-# SQL para adicionar as colunas de confirmação de email
-ADD_EMAIL_CONFIRMATION_COLUMNS = """
-DO $$
-BEGIN
-    -- Adicionar coluna email_confirmed
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name='user' 
-        AND column_name='email_confirmed'
-    ) THEN
-        ALTER TABLE "user" ADD COLUMN email_confirmed BOOLEAN DEFAULT FALSE;
-    END IF;
-
-    -- Adicionar coluna confirmation_token
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name='user' 
-        AND column_name='confirmation_token'
-    ) THEN
-        ALTER TABLE "user" ADD COLUMN confirmation_token VARCHAR(100) UNIQUE;
-    END IF;
-
-    -- Adicionar coluna confirmation_token_created_at
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.columns 
-        WHERE table_name='user' 
-        AND column_name='confirmation_token_created_at'
-    ) THEN
-        ALTER TABLE "user" ADD COLUMN confirmation_token_created_at TIMESTAMP;
-    END IF;
-END $$;
-"""
-
 def create_tables():
     try:
         print("Conectando ao banco de dados...")
@@ -181,9 +145,6 @@ def create_tables():
         
         print("Adicionando coluna pix_key se necessário...")
         cur.execute(ADD_PIX_KEY)
-        
-        print("Adicionando colunas de confirmação de email...")
-        cur.execute(ADD_EMAIL_CONFIRMATION_COLUMNS)
         
         # Commit das alterações
         conn.commit()

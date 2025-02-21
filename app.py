@@ -4,7 +4,6 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_migrate import Migrate
-from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import os
@@ -12,9 +11,7 @@ from werkzeug.utils import secure_filename
 from functools import wraps
 import time
 import stripe
-import logging
-from PIL import Image
-import secrets
+from flask_mail import Mail, Message
 from config import Config
 from sqlalchemy import text
 from sqlalchemy import func
@@ -25,27 +22,27 @@ STRIPE_PUBLIC_KEY = 'pk_test_51QbVcLKxtlwVKoGi1mssIKeOby7ZtYayRV9ZdE9aXJkbeK00RK
 
 app = Flask(__name__)
 app.config.from_object(Config)
-
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
-
-# Inicializar extensões
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
-mail = Mail(app)
-
-# Configurar o upload de arquivos
-UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///donate.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
+
+# Cria a pasta de uploads se não existir
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
+
+# Configuração do banco de dados
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+# Configuração do login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# Configuração do email
+mail = Mail(app)
 
 # Modelos
 class User(UserMixin, db.Model):
@@ -58,33 +55,20 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
     profile_image = db.Column(db.String(100))
     pix_key = db.Column(db.String(100), nullable=True)
-    email_confirmed = db.Column(db.Boolean, default=False)
-    confirmation_token = db.Column(db.String(100), unique=True, nullable=True)
-    confirmation_token_created_at = db.Column(db.DateTime, nullable=True)
-    
-    # Relacionamentos
     campaigns = db.relationship('Campaign', backref='user', lazy=True)
     donations = db.relationship('Donation', backref='donor', lazy=True)
     likes = db.relationship('Like', backref='user', lazy=True)
     comments = db.relationship('Comment', backref='author', lazy=True)
     campaign_views = db.relationship('CampaignView', backref='user', lazy=True)
-    
     # Relações para WithdrawalRequest
     requested_withdrawals = db.relationship('WithdrawalRequest',
                                           foreign_keys='WithdrawalRequest.user_id',
                                           backref='requester',
                                           lazy=True)
-                                          
     processed_withdrawals = db.relationship('WithdrawalRequest',
                                           foreign_keys='WithdrawalRequest.processed_by_id',
                                           backref='processor',
                                           lazy=True)
-                                          
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-        
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
 
 class Campaign(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -260,42 +244,6 @@ def get_waiting_time_for_withdrawal(campaign):
             return int(next_withdrawal_minutes - (time_since_reject.total_seconds() / 60))
     
     return None
-
-def generate_confirmation_token():
-    return secrets.token_urlsafe(32)
-
-def send_confirmation_email(user):
-    try:
-        token = generate_confirmation_token()
-        user.confirmation_token = token
-        user.confirmation_token_created_at = datetime.utcnow()
-        db.session.commit()
-        
-        confirmation_url = url_for('confirm_email', token=token, _external=True)
-        
-        app.logger.info(f"Preparando para enviar email para {user.email}")
-        app.logger.info(f"Configurações de email atuais:")
-        app.logger.info(f"MAIL_SERVER: {app.config.get('MAIL_SERVER')}")
-        app.logger.info(f"MAIL_PORT: {app.config.get('MAIL_PORT')}")
-        app.logger.info(f"MAIL_USE_TLS: {app.config.get('MAIL_USE_TLS')}")
-        app.logger.info(f"MAIL_USERNAME: {app.config.get('MAIL_USERNAME')}")
-        app.logger.info(f"MAIL_DEFAULT_SENDER: {app.config.get('MAIL_DEFAULT_SENDER')}")
-        
-        msg = Message('Confirme seu email - Donate Shop',
-                    sender=app.config.get('MAIL_DEFAULT_SENDER'),
-                    recipients=[user.email])
-        
-        msg.html = render_template('email/confirm_email.html',
-                                user=user,
-                                confirmation_url=confirmation_url)
-        
-        app.logger.info("Tentando enviar email...")
-        mail.send(msg)
-        app.logger.info("Email enviado com sucesso!")
-        
-    except Exception as e:
-        app.logger.error(f"Erro detalhado ao enviar email: {str(e)}", exc_info=True)
-        raise
 
 # Rotas
 @app.route('/')
@@ -497,55 +445,29 @@ def toggle_block(user_id):
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if current_user.is_authenticated:
-        return redirect(url_for('index'))
-        
     if request.method == 'POST':
-        try:
-            username = request.form.get('username')
-            email = request.form.get('email')
-            password = request.form.get('password')
-            
-            app.logger.info(f"Tentativa de registro para usuário: {username}, email: {email}")
-            
-            if User.query.filter_by(username=username).first():
-                flash('Nome de usuário já está em uso.', 'error')
-                return redirect(url_for('register'))
-                
-            if User.query.filter_by(email=email).first():
-                flash('Email já está em uso.', 'error')
-                return redirect(url_for('register'))
-            
-            user = User(username=username, email=email)
-            user.set_password(password)
-            
-            app.logger.info("Usuário criado, tentando salvar no banco...")
-            
-            db.session.add(user)
-            db.session.commit()
-            
-            app.logger.info("Usuário salvo com sucesso, tentando enviar email...")
-            
-            try:
-                # Verificar configurações de email
-                app.logger.info(f"Configurações de email: SERVER={app.config.get('MAIL_SERVER')}, PORT={app.config.get('MAIL_PORT')}, USERNAME={app.config.get('MAIL_USERNAME')}")
-                
-                send_confirmation_email(user)
-                app.logger.info("Email de confirmação enviado com sucesso")
-            except Exception as mail_error:
-                app.logger.error(f"Erro ao enviar email: {str(mail_error)}")
-                # Não vamos impedir o registro se o email falhar
-                flash('Cadastro realizado, mas houve um erro ao enviar o email de confirmação. Entre em contato com o suporte.', 'warning')
-                return redirect(url_for('login'))
-            
-            flash('Cadastro realizado com sucesso! Por favor, verifique seu email para confirmar sua conta.', 'success')
-            return redirect(url_for('login'))
-            
-        except Exception as e:
-            db.session.rollback()
-            app.logger.error(f"Erro completo no registro: {str(e)}", exc_info=True)
-            flash('Erro ao realizar cadastro. Por favor, tente novamente.', 'error')
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        user = User.query.filter_by(username=username).first()
+        if user:
+            flash('Nome de usuário já existe', 'error')
             return redirect(url_for('register'))
+            
+        user = User.query.filter_by(email=email).first()
+        if user:
+            flash('Email já está em uso', 'error')
+            return redirect(url_for('register'))
+            
+        new_user = User(username=username, email=email)
+        new_user.password_hash = generate_password_hash(password)
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        flash('Cadastro realizado com sucesso!', 'success')
+        return redirect(url_for('login'))
     
     return render_template('register.html')
 
@@ -559,7 +481,7 @@ def login():
         password = request.form.get('password')
         user = User.query.filter_by(username=username).first()
         
-        if user and user.check_password(password):
+        if user and check_password_hash(user.password_hash, password):
             if user.is_blocked:
                 flash('Sua conta está bloqueada. Entre em contato com o administrador.', 'error')
                 return redirect(url_for('login'))
@@ -1231,37 +1153,6 @@ def make_admin_secret():
             flash('Chave secreta inválida.', 'error')
     
     return render_template('make_admin.html')
-
-@app.route('/confirm_email/<token>')
-def confirm_email(token):
-    user = is_token_valid(token)
-    if not user:
-        flash('O link de confirmação é inválido ou expirou.', 'error')
-        return redirect(url_for('login'))
-    
-    user.email_confirmed = True
-    user.confirmation_token = None
-    user.confirmation_token_created_at = None
-    db.session.commit()
-    
-    flash('Email confirmado com sucesso! Agora você pode fazer login.', 'success')
-    return redirect(url_for('login'))
-
-@app.route('/resend_confirmation')
-@login_required
-def resend_confirmation():
-    if current_user.email_confirmed:
-        flash('Seu email já está confirmado!', 'info')
-        return redirect(url_for('profile'))
-    
-    try:
-        send_confirmation_email(current_user)
-        flash('Um novo email de confirmação foi enviado. Por favor, verifique sua caixa de entrada.', 'success')
-    except Exception as e:
-        app.logger.error(f'Erro ao enviar email de confirmação: {str(e)}')
-        flash('Erro ao enviar email de confirmação. Por favor, tente novamente.', 'error')
-    
-    return redirect(url_for('profile'))
 
 # Inicialização
 with app.app_context():

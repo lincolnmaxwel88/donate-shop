@@ -1,27 +1,35 @@
-from app import app
+import os
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
 import logging
 
 # Configurar logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-if __name__ == '__main__':
+# Criar app
+app = Flask(__name__)
+
+# Configurar banco de dados
+DATABASE_URL = "postgresql://postgres:JVnCsSTibEVcGjoDegqaeBInwMEhssyp@nozomi.proxy.rlwy.net:49195/railway"
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Inicializar SQLAlchemy
+db = SQLAlchemy(app)
+
+def test_connection():
     try:
-        # Tentar inicializar o app
+        # Tentar conectar ao banco
         with app.app_context():
-            from app import db
-            # Verificar conexão com o banco
             db.engine.connect()
             logger.info("Conexão com o banco estabelecida com sucesso!")
             
-            # Listar todas as tabelas
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
-            tables = inspector.get_table_names()
-            logger.info(f"Tabelas encontradas: {tables}")
-            
     except Exception as e:
-        logger.error(f"Erro ao inicializar aplicação: {str(e)}", exc_info=True)
+        logger.error(f"Erro ao conectar ao banco: {str(e)}", exc_info=True)
 
-    # Rodar o app em modo debug
-    app.run(debug=True, port=5000)
+if __name__ == '__main__':
+    test_connection()

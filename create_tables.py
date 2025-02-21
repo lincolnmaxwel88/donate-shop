@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS "user" (
     is_admin BOOLEAN DEFAULT FALSE,
     is_blocked BOOLEAN DEFAULT FALSE,
     profile_image VARCHAR(200),
+    pix_key VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -107,6 +108,21 @@ CREATE TABLE IF NOT EXISTS system_config (
 );
 """
 
+# SQL para adicionar a coluna pix_key se ela não existir
+ADD_PIX_KEY = """
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.columns 
+        WHERE table_name='user' 
+        AND column_name='pix_key'
+    ) THEN
+        ALTER TABLE "user" ADD COLUMN pix_key VARCHAR(100);
+    END IF;
+END $$;
+"""
+
 def create_tables():
     try:
         print("Conectando ao banco de dados...")
@@ -127,9 +143,12 @@ def create_tables():
         # Executar os comandos SQL
         cur.execute(CREATE_TABLES)
         
+        print("Adicionando coluna pix_key se necessário...")
+        cur.execute(ADD_PIX_KEY)
+        
         # Commit das alterações
         conn.commit()
-        print("Tabelas criadas com sucesso!")
+        print("Tabelas criadas/atualizadas com sucesso!")
         
         # Listar as tabelas criadas
         cur.execute("""
@@ -141,6 +160,17 @@ def create_tables():
         print("\nTabelas existentes no banco:")
         for table in cur.fetchall():
             print(f"- {table[0]}")
+            
+            # Se for a tabela user, vamos listar suas colunas
+            if table[0] == 'user':
+                cur.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'user'
+                """)
+                print("  Colunas:")
+                for column in cur.fetchall():
+                    print(f"  - {column[0]}")
         
     except Exception as e:
         print(f"Erro: {str(e)}")

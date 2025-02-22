@@ -535,7 +535,7 @@
                         {% for comment in campaign.comments|sort(attribute='created_at', reverse=true) %}
                             <div class="comment">
                                 <div class="comment-header d-flex align-items-center">
-                                    <img src="{{ url_for('static', filename=comment.author.profile_image) if comment.author.profile_image else url_for('static', filename='images/default-avatar.png') }}" 
+                                    <img src="{{ url_for('static', filename='uploads/' + comment.author.profile_image) if comment.author.profile_image else url_for('static', filename='img/default-avatar.png') }}" 
                                          alt="{{ comment.author.username }}" 
                                          class="rounded-circle me-2"
                                          style="width: 32px; height: 32px; object-fit: cover;">

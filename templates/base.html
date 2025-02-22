@@ -14,6 +14,7 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/like-animation.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/loading.css') }}">
     
     <style>
         body {
@@ -162,6 +163,11 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+    
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
@@ -331,6 +337,59 @@
                 
                 lastScrollTop = scrollTop;
             });
+        });
+    </script>
+    <script>
+        // Função para mostrar/esconder o loading
+        function toggleLoading(show) {
+            const overlay = document.querySelector('.loading-overlay');
+            if (show) {
+                overlay.classList.add('active');
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+
+        // Interceptar todos os forms
+        document.addEventListener('DOMContentLoaded', function() {
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function() {
+                    // Não mostrar loading para forms com data-no-loading
+                    if (!this.hasAttribute('data-no-loading')) {
+                        toggleLoading(true);
+                    }
+                });
+            });
+
+            // Interceptar requisições AJAX
+            const originalXHR = window.XMLHttpRequest;
+            function newXHR() {
+                const xhr = new originalXHR();
+                xhr.addEventListener('loadstart', function() {
+                    toggleLoading(true);
+                });
+                xhr.addEventListener('loadend', function() {
+                    toggleLoading(false);
+                });
+                return xhr;
+            }
+            window.XMLHttpRequest = newXHR;
+
+            // Interceptar requisições Fetch
+            const originalFetch = window.fetch;
+            window.fetch = function() {
+                toggleLoading(true);
+                return originalFetch.apply(this, arguments)
+                    .then(function(response) {
+                        toggleLoading(false);
+                        return response;
+                    })
+                    .catch(function(error) {
+                        toggleLoading(false);
+                        throw error;
+                    });
+            };
         });
     </script>
     {% block extra_js %}{% endblock %}

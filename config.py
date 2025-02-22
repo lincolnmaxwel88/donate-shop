@@ -4,7 +4,7 @@ from datetime import timedelta
 class Config:
     # Configurações básicas
     SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
-    CONTACT_EMAIL = 'lincolnmaxwel@gmail.com'  # Email que receberá as mensagens de contato
+    CONTACT_EMAIL = 'contato@doarsonhos.com.br'  # Email que receberá as mensagens de contato
     
     # Configurações do banco de dados
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///donate_shop.db')
@@ -21,9 +21,9 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max-limit
     
     # Configurações do Flask-Mail
-    MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-    MAIL_PORT = int(os.getenv('MAIL_PORT', '587'))
-    MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
-    MAIL_USERNAME = os.getenv('MAIL_USERNAME', 'lincolnmaxwel@gmail.com')
-    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', 'guib ycae qsmz kdpa')
-    MAIL_DEFAULT_SENDER = ('Donate Shop', 'lincolnmaxwel@gmail.com')  # Email que aparecerá como remetente
+    MAIL_SERVER = 'smtp.zoho.com'
+    MAIL_PORT = 587
+    MAIL_USE_TLS = True
+    MAIL_USERNAME = 'contato@doarsonhos.com.br'
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', 'Linday#1818')  # Coloque a senha no Railway
+    MAIL_DEFAULT_SENDER = ('Doar Sonhos', 'contato@doarsonhos.com.br')  # Email que aparecerá como remetente

@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
-import os
 from werkzeug.utils import secure_filename
+from datetime import datetime
+from sqlalchemy import func, or_, and_
 from functools import wraps
+import os
+import uuid
+from flask_migrate import Migrate
 import time
 import stripe
 from flask_mail import Mail, Message
 from config import Config
 from sqlalchemy import text
-from sqlalchemy import func
 
 # Configuração do Stripe
 stripe.api_key = 'sk_test_51QbVcLKxtlwVKoGi0AuzhFm6FmgCDnwZPmMZMCKYuBmex3wb4N9yIcOTubCJb9GGpF37zBnX1YZqeo7fd68GGyHX00j2yH2KeX'
@@ -248,8 +249,49 @@ def get_waiting_time_for_withdrawal(campaign):
 # Rotas
 @app.route('/')
 def index():
-    campaigns = Campaign.query.order_by(Campaign.created_at.desc()).all()
-    return render_template('index.html', campaigns=campaigns, current_year=datetime.now().year)
+    page = request.args.get('page', 1, type=int)
+    per_page = 6  # Número de campanhas por página
+    search = request.args.get('search', '')
+    status = request.args.get('status', 'active')  # Default é mostrar campanhas ativas
+    
+    # Iniciar a query base
+    query = Campaign.query
+    
+    # Aplicar filtro de busca
+    if search:
+        query = query.filter(Campaign.title.ilike(f'%{search}%'))
+    
+    # Aplicar filtro de status
+    now = datetime.now()
+    if status == 'active':
+        query = query.filter(Campaign.is_active == True)
+        query = query.filter(or_(Campaign.end_date == None, Campaign.end_date > now))
+    elif status == 'inactive':
+        query = query.filter(or_(Campaign.is_active == False, 
+                               and_(Campaign.end_date != None, Campaign.end_date <= now)))
+    
+    # Ordenar por data de criação
+    query = query.order_by(Campaign.created_at.desc())
+    
+    # Executar paginação
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    campaigns = pagination.items
+    
+    # Calcular estatísticas totais
+    total_stats = {
+        'total_campaigns': Campaign.query.count(),
+        'total_donated': db.session.query(func.sum(Donation.amount)).scalar() or 0,
+        'total_views': db.session.query(CampaignView).count()
+    }
+    
+    return render_template(
+        'index.html',
+        campaigns=campaigns,
+        pagination=pagination,
+        total_stats=total_stats,
+        current_year=datetime.now().year,
+        now=now
+    )
 
 @app.route('/about')
 def about():

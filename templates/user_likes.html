@@ -16,8 +16,10 @@
                             {% for campaign in campaigns %}
                                 <div class="col-md-6 mb-4">
                                     <div class="card h-100 border-0 shadow-sm hover-card">
-                                        {% if campaign.image_url %}
-                                            <img src="{{ campaign.image_url }}" class="card-img-top campaign-image" alt="{{ campaign.title }}">
+                                        {% if campaign.image %}
+                                            <img src="{{ url_for('static', filename='uploads/' + campaign.image) }}" class="card-img-top campaign-image" alt="{{ campaign.title }}">
+                                        {% else %}
+                                            <img src="{{ url_for('static', filename='img/default_campaign.svg') }}" class="card-img-top campaign-image" alt="Imagem padrão">
                                         {% endif %}
                                         <div class="card-body">
                                             <h5 class="card-title">{{ campaign.title }}</h5>

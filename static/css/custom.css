@@ -1,7 +1,7 @@
 /* Variáveis de cores */
 :root {
-    --primary-color: #2ecc71;
-    --secondary-color: #27ae60;
+    --primary-color: #E6C689;
+    --secondary-color: #d8bc89;
     --accent-color: #e74c3c;
     --text-color: #2c3e50;
     --light-gray: #ecf0f1;
@@ -18,23 +18,34 @@ body {
 /* Header e Navigation */
 .navbar {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    background-color: var(--white);
+    background-color: var(--primary-color) !important;
 }
 
 .navbar-brand {
     font-weight: 700;
-    color: var(--primary-color) !important;
+    color: var(--white) !important;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+    color: var(--white) !important;
+    opacity: 0.9;
+}
+
+.navbar-dark .navbar-nav .nav-link:hover {
+    opacity: 1;
+}
+
+.navbar-dark .navbar-toggler {
+    border-color: var(--white);
 }
 
 /* Hero Section */
 .hero-section {
-    background: linear-gradient(rgba(46, 204, 113, 0.9), rgba(39, 174, 96, 0.9)),
-                url('/static/img/hero-bg.svg');
+    background-image: url('/static/img/background_div.png');
     background-size: cover;
     background-position: center;
-    color: var(--white);
+    background-repeat: no-repeat;
     padding: 100px 0;
-    margin-bottom: 40px;
 }
 
 .hero-section h1 {
@@ -46,6 +57,21 @@ body {
 .hero-section p {
     font-size: 1.2rem;
     margin-bottom: 30px;
+}
+
+/* Ajuste responsivo */
+@media (max-width: 768px) {
+    .hero-section {
+        padding: 60px 0;
+    }
+    
+    .hero-section h1 {
+        font-size: 2.5rem;
+    }
+    
+    .hero-section p {
+        font-size: 1.2rem;
+    }
 }
 
 /* Cards de Campanha */
@@ -153,5 +179,9 @@ footer a:hover {
     
     .hero-section h1 {
         font-size: 2.5rem;
+    }
+    
+    .hero-section p {
+        font-size: 1.2rem;
     }
 }

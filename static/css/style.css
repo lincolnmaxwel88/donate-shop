@@ -19,7 +19,7 @@ body {
 }
 
 .progress-bar {
-    background-color: #0d6efd;
+    background-color: #C1AA91;
     transition: width 0.6s ease;
     min-width: 2em; /* Garante um espaço mínimo para números pequenos */
 }
@@ -50,26 +50,25 @@ body {
 }
 
 .nav-link.btn-primary {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+    background-color: #E6C689;
+    border-color: #E6C689;
     color: white;
 }
 
 .nav-link.btn-primary:hover {
-    background-color: #0b5ed7;
-    border-color: #0b5ed7;
+    background-color: #d8bc89;
+    border-color: #d8bc89;
     transform: translateY(-2px);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .nav-link.btn-outline-primary {
-    border: 2px solid #0d6efd;
-    color: #0d6efd;
-    background-color: transparent;
+    border: 2px solid #E6C689;
+    color: #E6C689;
 }
 
 .nav-link.btn-outline-primary:hover {
-    background-color: #0d6efd;
+    background-color: #E6C689;
     color: white;
     transform: translateY(-2px);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -78,6 +77,34 @@ body {
 .btn-primary {
     padding: 10px 20px;
     font-weight: 500;
+    background-color: #E6C689;
+    border-color: #E6C689;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active,
+.btn-primary.active,
+.btn-primary.show {
+    background-color: #d8bc89 !important;
+    border-color: #d8bc89 !important;
+    box-shadow: 0 0 0 0.25rem rgba(230, 198, 137, 0.5) !important;
+}
+
+.btn-outline-primary {
+    border: 2px solid #E6C689;
+    color: #E6C689;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active,
+.btn-outline-primary.active,
+.btn-outline-primary.show {
+    background-color: #E6C689 !important;
+    border-color: #E6C689 !important;
+    color: #fff !important;
+    box-shadow: 0 0 0 0.25rem rgba(230, 198, 137, 0.5) !important;
 }
 
 .card-title {
@@ -126,6 +153,77 @@ main {
     padding: 20px;
 }
 
+.logo-container {
+    display: flex;
+    align-items: center;
+}
+
+.logo-image {
+    height: 70px; /* Aumentado de 50px para 70px */
+    width: auto;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.hero-section {
+    background-image: url('/static/img/background_div.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    padding: 100px 0;
+    margin-bottom: 50px;
+    position: relative;
+    color: #fff; /* Texto branco para melhor contraste */
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* Sombra no texto para melhor legibilidade */
+}
+
+/* Removido o .hero-section::before que estava causando o overlay escuro */
+.hero-section .container {
+    position: relative;
+    z-index: 2;
+}
+
+.hero-section h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.hero-section p {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.hero-section .btn-light {
+    padding: 15px 40px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    border-radius: 30px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.hero-section .btn-light:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Ajuste responsivo */
+@media (max-width: 768px) {
+    .hero-section {
+        padding: 60px 0;
+    }
+    
+    .hero-section h1 {
+        font-size: 2.5rem;
+    }
+    
+    .hero-section p {
+        font-size: 1.2rem;
+    }
+}
+
+/* Ajuste responsivo para telas menores */
 @media (max-width: 768px) {
     .container {
         padding: 0 15px;
@@ -134,4 +232,25 @@ main {
     .card {
         margin-bottom: 20px;
     }
+    
+    .logo-image {
+        height: 90px; /* Aumentado de 40px para 55px */
+    }
+}
+
+.page-link {
+    color: var(--primary-color);
+}
+
+.page-link:hover {
+    color: var(--secondary-color);
+}
+
+.page-link:focus {
+    box-shadow: 0 0 0 0.25rem rgba(230, 198, 137, 0.5);
+}
+
+.page-item.active .page-link {
+    background-color: #E6C689;
+    border-color: #E6C689;
 }

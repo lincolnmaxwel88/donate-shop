@@ -55,7 +55,7 @@
     display: block;
     font-size: 1.5rem;
     font-weight: 600;
-    color: #0d6efd;
+    color: #E6C689;
     margin: 10px 0;
 }
 
@@ -84,12 +84,12 @@
 }
 
 .btn-confirm {
-    background-color: #0d6efd;
+    background-color: #E6C689;
     color: white;
 }
 
 .btn-confirm:hover {
-    background-color: #0b5ed7;
+    background-color: #d8bc89;
 }
 
 /* Animações */
@@ -109,4 +109,14 @@
 @keyframes fadeOut {
     from { opacity: 1; }
     to { opacity: 0; }
+}
+
+.modal-link {
+    color: #E6C689;
+    text-decoration: none;
+}
+
+.modal-link:hover {
+    color: #d8bc89;
+    text-decoration: underline;
 }

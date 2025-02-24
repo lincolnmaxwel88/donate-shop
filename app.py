@@ -16,11 +16,6 @@ import stripe
 from flask_mail import Mail, Message
 from config import Config
 from sqlalchemy import text
-import logging
-
-# Configuração de logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Configuração do Stripe
 stripe.api_key = 'sk_test_51QbVcLKxtlwVKoGi0AuzhFm6FmgCDnwZPmMZMCKYuBmex3wb4N9yIcOTubCJb9GGpF37zBnX1YZqeo7fd68GGyHX00j2yH2KeX'
@@ -34,44 +29,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
 
-# Configuração dos diretórios de upload
-def setup_upload_directories():
-    try:
-        # Diretório principal de uploads
-        if not os.path.exists(app.config['UPLOAD_FOLDER']):
-            logger.info(f"Criando diretório de uploads: {app.config['UPLOAD_FOLDER']}")
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-        # Diretório de uploads estático
-        static_uploads = os.path.join(app.static_folder, 'uploads')
-        if not os.path.exists(static_uploads):
-            logger.info(f"Criando diretório de uploads estático: {static_uploads}")
-            os.makedirs(static_uploads, exist_ok=True)
-
-        # Criar .gitkeep
-        gitkeep_file = os.path.join(static_uploads, '.gitkeep')
-        if not os.path.exists(gitkeep_file):
-            logger.info("Criando arquivo .gitkeep")
-            with open(gitkeep_file, 'w') as f:
-                pass
-
-        # Se estiver no Railway, criar link simbólico
-        if os.getenv('RAILWAY_ENVIRONMENT'):
-            try:
-                if os.path.exists(static_uploads) and not os.path.islink(static_uploads):
-                    os.remove(static_uploads)
-                if not os.path.exists(static_uploads):
-                    os.symlink(app.config['UPLOAD_FOLDER'], static_uploads)
-                    logger.info("Link simbólico criado com sucesso")
-            except Exception as e:
-                logger.error(f"Erro ao criar link simbólico: {str(e)}")
-
-    except Exception as e:
-        logger.error(f"Erro ao configurar diretórios de upload: {str(e)}")
-        raise
-
-# Configurar diretórios
-setup_upload_directories()
+# Cria a pasta de uploads se não existir
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
 # Configuração do banco de dados
 db = SQLAlchemy(app)
@@ -1236,118 +1196,84 @@ def make_admin_secret():
     
     return render_template('make_admin.html')
 
-# Tratamento de erros
-@app.errorhandler(500)
-def internal_error(error):
-    logger.error(f"Erro 500: {str(error)}")
-    db.session.rollback()
-    return render_template('error.html', error=error), 500
-
-@app.errorhandler(404)
-def not_found_error(error):
-    logger.error(f"Erro 404: {str(error)}")
-    return render_template('error.html', error=error), 404
-
-# Inicialização do banco de dados
+# Inicialização
 with app.app_context():
+    db.create_all()
+    
+    inspector = db.inspect(db.engine)
     try:
-        logger.info("Iniciando criação/atualização das tabelas do banco de dados")
-        db.create_all()
-        
-        inspector = db.inspect(db.engine)
-        
-        # Verificar e adicionar coluna pix_key na tabela withdrawal_request
-        try:
-            columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
-            if 'pix_key' not in columns:
-                logger.info("Adicionando coluna pix_key à tabela withdrawal_request")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN pix_key VARCHAR(100)'))
-                    conn.commit()
-        except Exception as e:
-            logger.error(f"Erro ao verificar/adicionar coluna pix_key em withdrawal_request: {e}")
-
-        # Verificar e adicionar coluna pix_key na tabela user
-        try:
-            columns = [col['name'] for col in inspector.get_columns('user')]
-            if 'pix_key' not in columns:
-                logger.info("Adicionando coluna pix_key à tabela user")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE user ADD COLUMN pix_key VARCHAR(100)'))
-                    conn.commit()
-        except Exception as e:
-            logger.error(f"Erro ao verificar/adicionar coluna pix_key em user: {e}")
-
-        # Verificar e adicionar coluna next_attempt_allowed_at
-        try:
-            columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
-            if 'next_attempt_allowed_at' not in columns:
-                logger.info("Adicionando coluna next_attempt_allowed_at à tabela withdrawal_request")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN next_attempt_allowed_at DATETIME'))
-                    conn.commit()
-        except Exception as e:
-            logger.error(f"Erro ao verificar/adicionar coluna next_attempt_allowed_at: {e}")
-
-        # Verificar e adicionar colunas na tabela system_config
-        try:
-            columns = [col['name'] for col in inspector.get_columns('system_config')]
-            if 'min_withdrawal_percentage' not in columns:
-                logger.info("Adicionando coluna min_withdrawal_percentage à tabela system_config")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE system_config ADD COLUMN min_withdrawal_percentage FLOAT DEFAULT 10.0'))
-                    conn.commit()
-            if 'next_withdrawal_minutes' not in columns:
-                logger.info("Adicionando coluna next_withdrawal_minutes à tabela system_config")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE system_config ADD COLUMN next_withdrawal_minutes INTEGER DEFAULT 1440'))
-                    conn.commit()
-            if 'gateway_fee_percentage' not in columns:
-                logger.info("Adicionando coluna gateway_fee_percentage à tabela system_config")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_percentage FLOAT DEFAULT 3.99'))
-                    conn.commit()
-            if 'gateway_fee_fixed' not in columns:
-                logger.info("Adicionando coluna gateway_fee_fixed à tabela system_config")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_fixed FLOAT DEFAULT 0.39'))
-                    conn.commit()
-        except Exception as e:
-            logger.error(f"Erro ao verificar/adicionar colunas em system_config: {e}")
-
-        # Verificar e adicionar coluna net_amount na tabela donation
-        try:
-            columns = [col['name'] for col in inspector.get_columns('donation')]
-            if 'net_amount' not in columns:
-                logger.info("Adicionando coluna net_amount à tabela donation")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE donation ADD COLUMN net_amount FLOAT'))
-                    conn.commit()
-                
-                config = SystemConfig.query.first()
-                if config:
-                    donations = Donation.query.all()
-                    for donation in donations:
-                        gateway_fee = (donation.amount * config.gateway_fee_percentage / 100) + config.gateway_fee_fixed
-                        donation.net_amount = donation.amount - gateway_fee
-                    db.session.commit()
-        except Exception as e:
-            logger.error(f"Erro ao verificar/adicionar coluna net_amount: {e}")
-
-        # Verificar e adicionar coluna is_active na tabela campaign
-        try:
-            columns = [col['name'] for col in inspector.get_columns('campaign')]
-            if 'is_active' not in columns:
-                logger.info("Adicionando coluna is_active à tabela campaign")
-                with db.engine.connect() as conn:
-                    conn.execute(text('ALTER TABLE campaign ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
-                    conn.commit()
-        except Exception as e:
-            logger.error(f"Erro ao verificar/adicionar coluna is_active: {e}")
-
-        logger.info("Inicialização do banco de dados concluída com sucesso")
+        columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
+        if 'pix_key' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN pix_key VARCHAR(100)'))
+                conn.commit()
     except Exception as e:
-        logger.error(f"Erro durante a inicialização do banco de dados: {e}")
+        print(f"Erro ao verificar/adicionar coluna pix_key: {e}")
+
+    try:
+        columns = [col['name'] for col in inspector.get_columns('user')]
+        if 'pix_key' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE user ADD COLUMN pix_key VARCHAR(100)'))
+                conn.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
+    
+    try:
+        columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
+        if 'next_attempt_allowed_at' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN next_attempt_allowed_at DATETIME'))
+                conn.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
+    
+    try:
+        columns = [col['name'] for col in inspector.get_columns('system_config')]
+        if 'min_withdrawal_percentage' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE system_config ADD COLUMN min_withdrawal_percentage FLOAT DEFAULT 10.0'))
+                conn.commit()
+        if 'next_withdrawal_minutes' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE system_config ADD COLUMN next_withdrawal_minutes INTEGER DEFAULT 1440'))
+                conn.commit()
+        if 'gateway_fee_percentage' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_percentage FLOAT DEFAULT 3.99'))
+                conn.commit()
+        if 'gateway_fee_fixed' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_fixed FLOAT DEFAULT 0.39'))
+                conn.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
+    
+    try:
+        columns = [col['name'] for col in inspector.get_columns('donation')]
+        if 'net_amount' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE donation ADD COLUMN net_amount FLOAT'))
+                conn.commit()
+            
+            config = SystemConfig.query.first()
+            if config:
+                donations = Donation.query.all()
+                for donation in donations:
+                    gateway_fee = (donation.amount * config.gateway_fee_percentage / 100) + config.gateway_fee_fixed
+                    donation.net_amount = donation.amount - gateway_fee
+                db.session.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
+    
+    try:
+        columns = [col['name'] for col in inspector.get_columns('campaign')]
+        if 'is_active' not in columns:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE campaign ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
+                conn.commit()
+    except Exception as e:
+        print(f"Erro ao verificar colunas: {e}")
 
 # Registrar filtros Jinja2
 app.jinja_env.filters['format_datetime'] = format_datetime

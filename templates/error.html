@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <h1 class="display-4 mb-4">Oops!</h1>
+            <p class="lead">Desculpe, ocorreu um erro inesperado.</p>
+            {% if error %}
+            <div class="alert alert-danger">
+                {{ error }}
+            </div>
+            {% endif %}
+            <a href="{{ url_for('index') }}" class="btn btn-primary mt-3">Voltar para a página inicial</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

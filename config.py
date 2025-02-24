@@ -17,7 +17,7 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(days=31)
     
     # Configurações de upload
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+    UPLOAD_FOLDER = '/tmp/uploads' if os.getenv('RAILWAY_ENVIRONMENT') else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max-limit
     
     # Configurações do Flask-Mail
@@ -25,5 +25,5 @@ class Config:
     MAIL_PORT = 587
     MAIL_USE_TLS = True
     MAIL_USERNAME = 'contato@doarsonhos.com.br'
-    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', 'Linday#1818')  # Coloque a senha no Railway
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '')  # Coloque a senha no Railway
     MAIL_DEFAULT_SENDER = ('Doar Sonhos', 'contato@doarsonhos.com.br')  # Email que aparecerá como remetente

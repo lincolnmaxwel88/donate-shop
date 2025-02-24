@@ -31,7 +31,16 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
 
 # Cria a pasta de uploads se não existir
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Cria o link simbólico para a pasta de uploads se estivermos no Railway
+if os.getenv('RAILWAY_ENVIRONMENT'):
+    static_uploads = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+    if not os.path.exists(static_uploads):
+        os.makedirs(static_uploads, exist_ok=True)
+    if not os.path.exists(os.path.join(static_uploads, '.gitkeep')):
+        with open(os.path.join(static_uploads, '.gitkeep'), 'w') as f:
+            pass
 
 # Configuração do banco de dados
 db = SQLAlchemy(app)

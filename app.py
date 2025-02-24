@@ -1248,6 +1248,110 @@ def not_found_error(error):
     logger.error(f"Erro 404: {str(error)}")
     return render_template('error.html', error=error), 404
 
-# Inicialização
+# Inicialização do banco de dados
+with app.app_context():
+    try:
+        logger.info("Iniciando criação/atualização das tabelas do banco de dados")
+        db.create_all()
+        
+        inspector = db.inspect(db.engine)
+        
+        # Verificar e adicionar coluna pix_key na tabela withdrawal_request
+        try:
+            columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
+            if 'pix_key' not in columns:
+                logger.info("Adicionando coluna pix_key à tabela withdrawal_request")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN pix_key VARCHAR(100)'))
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Erro ao verificar/adicionar coluna pix_key em withdrawal_request: {e}")
+
+        # Verificar e adicionar coluna pix_key na tabela user
+        try:
+            columns = [col['name'] for col in inspector.get_columns('user')]
+            if 'pix_key' not in columns:
+                logger.info("Adicionando coluna pix_key à tabela user")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE user ADD COLUMN pix_key VARCHAR(100)'))
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Erro ao verificar/adicionar coluna pix_key em user: {e}")
+
+        # Verificar e adicionar coluna next_attempt_allowed_at
+        try:
+            columns = [col['name'] for col in inspector.get_columns('withdrawal_request')]
+            if 'next_attempt_allowed_at' not in columns:
+                logger.info("Adicionando coluna next_attempt_allowed_at à tabela withdrawal_request")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE withdrawal_request ADD COLUMN next_attempt_allowed_at DATETIME'))
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Erro ao verificar/adicionar coluna next_attempt_allowed_at: {e}")
+
+        # Verificar e adicionar colunas na tabela system_config
+        try:
+            columns = [col['name'] for col in inspector.get_columns('system_config')]
+            if 'min_withdrawal_percentage' not in columns:
+                logger.info("Adicionando coluna min_withdrawal_percentage à tabela system_config")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE system_config ADD COLUMN min_withdrawal_percentage FLOAT DEFAULT 10.0'))
+                    conn.commit()
+            if 'next_withdrawal_minutes' not in columns:
+                logger.info("Adicionando coluna next_withdrawal_minutes à tabela system_config")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE system_config ADD COLUMN next_withdrawal_minutes INTEGER DEFAULT 1440'))
+                    conn.commit()
+            if 'gateway_fee_percentage' not in columns:
+                logger.info("Adicionando coluna gateway_fee_percentage à tabela system_config")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_percentage FLOAT DEFAULT 3.99'))
+                    conn.commit()
+            if 'gateway_fee_fixed' not in columns:
+                logger.info("Adicionando coluna gateway_fee_fixed à tabela system_config")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE system_config ADD COLUMN gateway_fee_fixed FLOAT DEFAULT 0.39'))
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Erro ao verificar/adicionar colunas em system_config: {e}")
+
+        # Verificar e adicionar coluna net_amount na tabela donation
+        try:
+            columns = [col['name'] for col in inspector.get_columns('donation')]
+            if 'net_amount' not in columns:
+                logger.info("Adicionando coluna net_amount à tabela donation")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE donation ADD COLUMN net_amount FLOAT'))
+                    conn.commit()
+                
+                config = SystemConfig.query.first()
+                if config:
+                    donations = Donation.query.all()
+                    for donation in donations:
+                        gateway_fee = (donation.amount * config.gateway_fee_percentage / 100) + config.gateway_fee_fixed
+                        donation.net_amount = donation.amount - gateway_fee
+                    db.session.commit()
+        except Exception as e:
+            logger.error(f"Erro ao verificar/adicionar coluna net_amount: {e}")
+
+        # Verificar e adicionar coluna is_active na tabela campaign
+        try:
+            columns = [col['name'] for col in inspector.get_columns('campaign')]
+            if 'is_active' not in columns:
+                logger.info("Adicionando coluna is_active à tabela campaign")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE campaign ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Erro ao verificar/adicionar coluna is_active: {e}")
+
+        logger.info("Inicialização do banco de dados concluída com sucesso")
+    except Exception as e:
+        logger.error(f"Erro durante a inicialização do banco de dados: {e}")
+
+# Registrar filtros Jinja2
+app.jinja_env.filters['format_datetime'] = format_datetime
+app.jinja_env.filters['format_currency_br'] = format_currency_br
+
 if __name__ == '__main__':
     app.run(debug=True)

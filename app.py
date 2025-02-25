@@ -10,12 +10,28 @@ from sqlalchemy import func, or_, and_
 from functools import wraps
 import os
 import uuid
-from flask_migrate import Migrate
 import time
 import stripe
 from flask_mail import Mail, Message
 from config import Config
 from sqlalchemy import text
+import logging
+from logging.handlers import RotatingFileHandler
+
+# Configuração de logging
+if not os.environ.get('DEBUG'):
+    if not os.path.exists('logs'):
+        os.mkdir('logs')
+    file_handler = RotatingFileHandler('logs/doarsonhos.log', maxBytes=10240, backupCount=10)
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    logging.getLogger('werkzeug').setLevel(logging.INFO)
+    logging.getLogger('werkzeug').addHandler(file_handler)
+    logging.getLogger().setLevel(logging.INFO)
+    logging.getLogger().addHandler(file_handler)
+    logging.info('Doar Sonhos startup')
 
 # Configuração do Stripe
 stripe.api_key = 'sk_test_51QbVcLKxtlwVKoGi0AuzhFm6FmgCDnwZPmMZMCKYuBmex3wb4N9yIcOTubCJb9GGpF37zBnX1YZqeo7fd68GGyHX00j2yH2KeX'
@@ -23,11 +39,6 @@ STRIPE_PUBLIC_KEY = 'pk_test_51QbVcLKxtlwVKoGi1mssIKeOby7ZtYayRV9ZdE9aXJkbeK00RK
 
 app = Flask(__name__)
 app.config.from_object(Config)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///donate.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
 
 # Cria a pasta de uploads se não existir
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -519,19 +530,42 @@ def login():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        user = User.query.filter_by(username=username).first()
-        
-        if user and check_password_hash(user.password_hash, password):
+        try:
+            username = request.form.get('username')
+            password = request.form.get('password')
+            
+            app.logger.info(f"Tentativa de login para usuário: {username}")
+            
+            try:
+                user = User.query.filter_by(username=username).first()
+            except Exception as db_error:
+                app.logger.error(f"Erro no banco de dados: {str(db_error)}")
+                flash('Erro de conexão com o banco de dados. Por favor, tente novamente.', 'error')
+                return redirect(url_for('login'))
+            
+            if not user:
+                app.logger.warning(f"Usuário não encontrado: {username}")
+                flash('Usuário ou senha inválidos', 'error')
+                return redirect(url_for('login'))
+            
+            if not check_password_hash(user.password_hash, password):
+                app.logger.warning(f"Senha incorreta para usuário: {username}")
+                flash('Usuário ou senha inválidos', 'error')
+                return redirect(url_for('login'))
+            
             if user.is_blocked:
+                app.logger.warning(f"Tentativa de login de usuário bloqueado: {username}")
                 flash('Sua conta está bloqueada. Entre em contato com o administrador.', 'error')
                 return redirect(url_for('login'))
             
             login_user(user)
+            app.logger.info(f"Login bem-sucedido para usuário: {username}")
             return redirect(url_for('index'))
             
-        flash('Usuário ou senha inválidos', 'error')
+        except Exception as e:
+            app.logger.error(f"Erro no login: {str(e)}")
+            flash('Ocorreu um erro ao tentar fazer login. Por favor, tente novamente.', 'error')
+            return redirect(url_for('login'))
     
     return render_template('login.html', current_year=datetime.now().year)
 

@@ -46,8 +46,35 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
 # Configuração do banco de dados
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
+def init_db(max_retries=3, retry_delay=5):
+    for attempt in range(max_retries):
+        try:
+            db = SQLAlchemy(app)
+            migrate = Migrate(app, db)
+            
+            # Teste de conexão
+            with app.app_context():
+                # Tenta fazer uma query simples para testar a conexão
+                db.session.execute(text('SELECT 1'))
+                app.logger.info("Conexão com o banco de dados estabelecida com sucesso!")
+            return db
+        except Exception as e:
+            app.logger.error(f"Tentativa {attempt + 1} de {max_retries} falhou: {str(e)}")
+            if "could not connect to server" in str(e).lower():
+                app.logger.error("Não foi possível conectar ao servidor PostgreSQL. Verifique se o servidor está acessível.")
+            elif "password authentication failed" in str(e).lower():
+                app.logger.error("Falha na autenticação. Verifique as credenciais do banco de dados.")
+            elif "database" in str(e).lower() and "does not exist" in str(e).lower():
+                app.logger.error("O banco de dados especificado não existe.")
+            
+            if attempt < max_retries - 1:
+                app.logger.info(f"Aguardando {retry_delay} segundos antes de tentar novamente...")
+                time.sleep(retry_delay)
+            else:
+                app.logger.error("Todas as tentativas de conexão falharam.")
+                raise
+
+db = init_db()
 
 # Configuração do login
 login_manager = LoginManager()

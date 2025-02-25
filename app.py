@@ -12,6 +12,7 @@ import os
 import uuid
 import time
 import stripe
+from flask_migrate import Migrate
 from flask_mail import Mail, Message
 from config import Config
 from sqlalchemy import text

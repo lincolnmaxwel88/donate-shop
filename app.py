@@ -55,8 +55,8 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256))
     is_admin = db.Column(db.Boolean, default=False)
     is_blocked = db.Column(db.Boolean, default=False)
-    is_active = db.Column(db.Boolean, default=False)  # Novo campo
-    activation_token = db.Column(db.String(100), unique=True)  # Token para ativação
+    is_active = db.Column(db.Boolean, default=False)
+    activation_token = db.Column(db.Text, unique=True)
     created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
     profile_image = db.Column(db.String(100))
     pix_key = db.Column(db.String(100), nullable=True)

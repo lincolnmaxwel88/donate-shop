@@ -279,13 +279,18 @@ def send_activation_email(user):
         print(f"MAIL_DEFAULT_SENDER: {app.config['MAIL_DEFAULT_SENDER']}")
         print(f"MAIL_PASSWORD está definido: {'Sim' if app.config['MAIL_PASSWORD'] else 'Não'}")
         
+        # Criar mensagem
         msg = Message(subject,
                      sender=app.config['MAIL_DEFAULT_SENDER'],
-                     recipients=[user.email],
-                     html=html_body)
+                     recipients=[user.email])
+        msg.html = html_body
         
         print("\nTentando enviar email...")
-        mail.send(msg)
+        
+        # Enviar email usando SMTP diretamente
+        with mail.connect() as smtp:
+            smtp.send(msg)
+        
         print("Email enviado com sucesso!")
         print("=== FIM DO ENVIO DE EMAIL ===\n")
         return True

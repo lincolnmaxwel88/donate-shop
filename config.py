@@ -22,9 +22,10 @@ class Config:
     MAIL_USE_TLS = True
     MAIL_USE_SSL = False
     MAIL_USERNAME = 'no-reply@doarsonhos.com.br'
-    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '')  # Definir no Railway
-    MAIL_DEFAULT_SENDER = ('Doar Sonhos', 'no-reply@doarsonhos.com.br')
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', 'Linday#1818')  # Definir no Railway
+    MAIL_DEFAULT_SENDER = 'no-reply@doarsonhos.com.br'  
     MAIL_DEBUG = True  # Habilita logs detalhados
+    MAIL_ASCII_ATTACHMENTS = True  # Força codificação ASCII
     
     # Configurações de upload
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')

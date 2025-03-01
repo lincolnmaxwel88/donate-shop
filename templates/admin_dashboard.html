@@ -63,6 +63,7 @@
                                             <th>Doações</th>
                                             <th>Admin</th>
                                             <th>Status</th>
+                                            <th>Ativo</th>
                                             <th>Ações</th>
                                         </tr>
                                     </thead>
@@ -89,6 +90,13 @@
                                                 </span>
                                             </td>
                                             <td>
+                                                {% if user.is_active %}
+                                                    <span class="badge bg-success">Sim</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning text-dark">Não</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
                                                 {% if not user.is_admin or current_user.id != user.id %}
                                                 <div class="btn-group" role="group">
                                                     <button type="button" 
@@ -109,6 +117,13 @@
                                                             <i class="fas fa-lock"></i> Bloquear
                                                         {% endif %}
                                                     </button>
+                                                    {% if not user.is_active %}
+                                                        <a href="{{ url_for('admin_activate_user', user_id=user.id) }}" 
+                                                           class="btn btn-sm btn-primary"
+                                                           onclick="return confirm('Tem certeza que deseja ativar este usuário?')">
+                                                            Ativar Conta
+                                                        </a>
+                                                    {% endif %}
                                                 </div>
                                                 {% endif %}
                                             </td>

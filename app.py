@@ -1394,6 +1394,26 @@ def make_admin_secret():
     
     return render_template('make_admin.html')
 
+@app.route('/admin/activate_user/<int:user_id>')
+@login_required
+def admin_activate_user(user_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+        
+    try:
+        user = User.query.get_or_404(user_id)
+        user.is_active = True
+        user.activation_token = None
+        db.session.commit()
+        flash(f'Conta do usuário {user.username} ativada com sucesso!', 'success')
+    except Exception as e:
+        print(f"Erro ao ativar usuário: {str(e)}")
+        db.session.rollback()
+        flash('Erro ao ativar usuário.', 'error')
+    
+    return redirect(url_for('admin_dashboard'))
+
 # Inicialização
 with app.app_context():
     db.create_all()

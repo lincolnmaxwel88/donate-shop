@@ -7,25 +7,32 @@
             <div class="card-body">
                 <h2 class="card-title text-center mb-4">Junte-se ao Doar Sonhos</h2>
                 <p class="text-center text-muted mb-4">Crie sua conta e comece a realizar sonhos</p>
-                <form method="POST">
+                <form method="POST" id="registerForm">
                     <div class="mb-3">
                         <label for="username" class="form-label">Usuário</label>
                         <input type="text" class="form-control" id="username" name="username" required>
+                        <div class="invalid-feedback">O nome de usuário é obrigatório</div>
                     </div>
                     <div class="mb-3">
                         <label for="email" class="form-label">Email</label>
                         <input type="email" class="form-control" id="email" name="email" required>
+                        <div class="invalid-feedback">Por favor, insira um email válido</div>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Senha</label>
                         <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="invalid-feedback">A senha é obrigatória</div>
                     </div>
                     <div class="mb-3">
                         <label for="confirm_password" class="form-label">Confirmar Senha</label>
                         <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        <div class="invalid-feedback">As senhas não coincidem</div>
                     </div>
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Criar Conta</button>
+                        <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" id="loadingSpinner"></span>
+                            <span id="btnText">Criar Conta</span>
+                        </button>
                     </div>
                 </form>
                 <p class="text-center mt-3">
@@ -35,4 +42,88 @@
         </div>
     </div>
 </div>
+
+<script>
+function validateForm() {
+    const form = document.getElementById('registerForm');
+    const username = document.getElementById('username');
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Resetar validações anteriores
+    form.querySelectorAll('.is-invalid').forEach(input => {
+        input.classList.remove('is-invalid');
+    });
+    
+    let isValid = true;
+    
+    // Validar campos obrigatórios
+    if (!username.value.trim()) {
+        username.classList.add('is-invalid');
+        isValid = false;
+    }
+    
+    // Validar email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.value)) {
+        email.classList.add('is-invalid');
+        isValid = false;
+    }
+    
+    // Validar se as senhas coincidem
+    if (!password.value) {
+        password.classList.add('is-invalid');
+        isValid = false;
+    }
+    
+    if (!confirmPassword.value || password.value !== confirmPassword.value) {
+        confirmPassword.classList.add('is-invalid');
+        isValid = false;
+    }
+    
+    // Habilitar/desabilitar botão baseado na validação
+    submitBtn.disabled = !isValid;
+}
+
+// Adicionar validação em tempo real para todos os campos
+document.getElementById('username').addEventListener('input', validateForm);
+document.getElementById('email').addEventListener('input', validateForm);
+document.getElementById('password').addEventListener('input', validateForm);
+document.getElementById('confirm_password').addEventListener('input', validateForm);
+
+// Tratar o envio do formulário
+document.getElementById('registerForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const btnText = document.getElementById('btnText');
+    
+    // Se o botão estiver habilitado, mostrar loading e enviar
+    if (!submitBtn.disabled) {
+        loadingSpinner.classList.remove('d-none');
+        btnText.textContent = 'Cadastrando...';
+        submitBtn.disabled = true;
+        this.submit();
+    }
+});
+
+// Validar formulário ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    validateForm();
+    
+    // Se houver mensagem de erro, resetar o loading
+    const flashMessages = document.querySelectorAll('.alert-error');
+    if (flashMessages.length > 0) {
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const btnText = document.getElementById('btnText');
+        
+        loadingSpinner.classList.add('d-none');
+        btnText.textContent = 'Criar Conta';
+        validateForm(); // Isso vai controlar o estado disabled do botão
+    }
+});
+</script>
 {% endblock %}

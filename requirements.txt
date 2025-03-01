@@ -5,7 +5,7 @@ Flask-Migrate==4.1.0
 Flask-SQLAlchemy==3.1.1
 Pillow==11.1.0
 python-dotenv==1.0.1
-psycopg2-binary==2.9.9
+mysqlclient==2.2.4
 requests==2.32.3
 SQLAlchemy==2.0.38
 stripe==11.4.1

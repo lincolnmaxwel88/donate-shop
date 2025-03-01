@@ -1,1 +1,1 @@
-web: gunicorn -c gunicorn_config.py app:app
+web: python migrations/railway_migrate.py && gunicorn app:app

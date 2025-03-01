@@ -49,19 +49,53 @@ def init_db():
             # Alterar o tamanho do campo password_hash
             print("Alterando tamanho do campo password_hash...")
             try:
-                db.session.execute(text("""
-                    ALTER TABLE "user" 
-                    ALTER COLUMN password_hash TYPE character varying(256)
-                """))
+                if 'sqlite' in str(db.engine.url):
+                    # SQLite não suporta ALTER COLUMN, precisamos recriar a tabela
+                    db.session.execute(text("""
+                        CREATE TABLE IF NOT EXISTS user_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            username VARCHAR(80) NOT NULL UNIQUE,
+                            email VARCHAR(120) NOT NULL UNIQUE,
+                            password_hash VARCHAR(256),
+                            is_admin BOOLEAN DEFAULT 0,
+                            is_blocked BOOLEAN DEFAULT 0,
+                            is_active BOOLEAN DEFAULT 0,
+                            activation_token VARCHAR(100) UNIQUE,
+                            created_at DATETIME,
+                            profile_image VARCHAR(100),
+                            pix_key VARCHAR(100)
+                        )
+                    """))
+                    db.session.execute(text("""
+                        INSERT OR IGNORE INTO user_new 
+                        SELECT id, username, email, password_hash, is_admin, is_blocked, 
+                               0 as is_active, NULL as activation_token, created_at, 
+                               profile_image, pix_key 
+                        FROM user
+                    """))
+                    db.session.execute(text("DROP TABLE IF EXISTS user"))
+                    db.session.execute(text("ALTER TABLE user_new RENAME TO user"))
+                else:
+                    # PostgreSQL suporta ALTER COLUMN
+                    db.session.execute(text("""
+                        ALTER TABLE "user" 
+                        ALTER COLUMN password_hash TYPE character varying(256);
+                        ALTER TABLE "user"
+                        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false;
+                        ALTER TABLE "user"
+                        ADD COLUMN IF NOT EXISTS activation_token VARCHAR(100) UNIQUE;
+                    """))
                 db.session.commit()
-                print("Campo password_hash alterado com sucesso!")
+                print("Campos alterados com sucesso!")
             except Exception as e:
-                print(f"Aviso: Não foi possível alterar o campo password_hash: {str(e)}")
+                print(f"Aviso: Não foi possível alterar os campos: {str(e)}")
                 db.session.rollback()
             
             # Listar tabelas criadas
             tables = db.session.execute(text(
-                'SELECT table_name FROM information_schema.tables WHERE table_schema = \'public\''
+                'SELECT name FROM sqlite_master WHERE type="table"'
+                if 'sqlite' in str(db.engine.url)
+                else 'SELECT table_name FROM information_schema.tables WHERE table_schema = \'public\''
             )).fetchall()
             print("\nTabelas no banco de dados:")
             for table in tables:

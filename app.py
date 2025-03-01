@@ -681,20 +681,29 @@ def register():
 
 @app.route('/activate/<token>')
 def activate_account(token):
-    user = User.query.filter_by(activation_token=token).first()
-    
-    if user:
+    try:
+        user = User.query.filter_by(activation_token=token).first()
+        
+        if not user:
+            flash('Link de ativação inválido ou expirado.', 'error')
+            return redirect(url_for('login'))
+            
         if user.is_active:
-            flash('Esta conta já está ativa!', 'info')
-        else:
-            user.is_active = True
-            user.activation_token = None  # Invalidar o token após uso
-            db.session.commit()
-            flash('Sua conta foi ativada com sucesso! Agora você pode fazer login.', 'success')
-    else:
-        flash('Link de ativação inválido!', 'error')
-    
-    return redirect(url_for('login'))
+            flash('Sua conta já está ativa! Faça login para continuar.', 'info')
+            return redirect(url_for('login'))
+            
+        user.is_active = True
+        user.activation_token = None  # Invalida o token após uso
+        db.session.commit()
+        
+        flash('Sua conta foi ativada com sucesso! Agora você pode fazer login.', 'success')
+        return redirect(url_for('login'))
+        
+    except Exception as e:
+        print(f"Erro ao ativar conta: {str(e)}")
+        db.session.rollback()
+        flash('Ocorreu um erro ao ativar sua conta. Por favor, tente novamente.', 'error')
+        return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

@@ -1,11 +1,15 @@
 import os
 from app import app, db, User, SystemConfig
+from flask_migrate import upgrade
 
 print("Iniciando configuração do banco de dados...")
 print(f"DATABASE_URL: {app.config['SQLALCHEMY_DATABASE_URI']}")
 
 try:
     with app.app_context():
+        print("Executando migrações...")
+        upgrade()
+        
         print("Criando todas as tabelas...")
         db.create_all()
         print("Tabelas criadas com sucesso!")

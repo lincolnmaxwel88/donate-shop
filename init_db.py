@@ -1,10 +1,8 @@
-from flask_migrate import upgrade
-from app import app, db
+from app import app, db, User, SystemConfig
 import os
 import time
-from sqlalchemy import text
+from sqlalchemy import text, DDL
 from sqlalchemy.exc import OperationalError
-from app import User, SystemConfig
 
 def wait_for_db():
     """Espera o banco de dados ficar disponível"""
@@ -43,34 +41,42 @@ def init_db():
         return False
     
     try:
-        # Executar migrações pendentes
-        print("Executando migrações...")
         with app.app_context():
-            upgrade()
-        
-        # Criar tabelas (caso alguma não tenha sido criada pelas migrações)
-        print("Criando tabelas...")
-        with app.app_context():
+            # Criar tabelas
+            print("Criando tabelas...")
             db.create_all()
             
-        # Listar tabelas criadas
-        with app.app_context():
-            # Usar raw SQL para listar tabelas
-            tables = db.session.execute(text('SELECT table_name FROM information_schema.tables WHERE table_schema = \'public\'')).fetchall()
+            # Alterar o tamanho do campo password_hash
+            print("Alterando tamanho do campo password_hash...")
+            try:
+                db.session.execute(text("""
+                    ALTER TABLE "user" 
+                    ALTER COLUMN password_hash TYPE character varying(256)
+                """))
+                db.session.commit()
+                print("Campo password_hash alterado com sucesso!")
+            except Exception as e:
+                print(f"Aviso: Não foi possível alterar o campo password_hash: {str(e)}")
+                db.session.rollback()
+            
+            # Listar tabelas criadas
+            tables = db.session.execute(text(
+                'SELECT table_name FROM information_schema.tables WHERE table_schema = \'public\''
+            )).fetchall()
             print("\nTabelas no banco de dados:")
             for table in tables:
                 print(f"- {table[0]}")
+            
+            # Criar configuração inicial do sistema se não existir
+            if not SystemConfig.query.first():
+                print("\nCriando configuração inicial do sistema...")
+                config = SystemConfig()
+                db.session.add(config)
+                db.session.commit()
+                print("Configuração inicial criada!")
+            else:
+                print("\nConfiguração do sistema já existe!")
                 
-        # Criar configuração inicial do sistema se não existir
-        if not SystemConfig.query.first():
-            print("\nCriando configuração inicial do sistema...")
-            config = SystemConfig()
-            db.session.add(config)
-            db.session.commit()
-            print("Configuração inicial criada!")
-        else:
-            print("\nConfiguração do sistema já existe!")
-
         print("\nBanco de dados inicializado com sucesso!")
         return True
         

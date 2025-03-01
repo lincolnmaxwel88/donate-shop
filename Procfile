@@ -1,1 +1,1 @@
-web: bash init_railway.sh
+web: python sync_railway.py && gunicorn app:app

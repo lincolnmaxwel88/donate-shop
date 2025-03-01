@@ -252,14 +252,15 @@ def get_waiting_time_for_withdrawal(campaign):
 
 def send_activation_email(user):
     try:
-        print(f"Iniciando envio de email para {user.email}...")
+        print("\n=== INICIANDO ENVIO DE EMAIL ===")
+        print(f"Enviando para: {user.email}")
         
         token = secrets.token_urlsafe(32)
         user.activation_token = token
         db.session.commit()
         
         activation_url = url_for('activate_account', token=token, _external=True)
-        print(f"URL de ativação gerada: {activation_url}")
+        print(f"URL de ativação: {activation_url}")
         
         subject = 'Ative sua conta no Doar Sonhos'
         html_body = f'''
@@ -270,26 +271,32 @@ def send_activation_email(user):
         <p>Atenciosamente,<br>Equipe Doar Sonhos</p>
         '''
         
-        msg = Message(subject,
-                     sender=app.config['MAIL_DEFAULT_SENDER'],
-                     recipients=[user.email],
-                     html=html_body)
-        
-        print("Configurações de email:")
+        print("\nConfigurações de email:")
         print(f"MAIL_SERVER: {app.config['MAIL_SERVER']}")
         print(f"MAIL_PORT: {app.config['MAIL_PORT']}")
         print(f"MAIL_USE_TLS: {app.config['MAIL_USE_TLS']}")
         print(f"MAIL_USERNAME: {app.config['MAIL_USERNAME']}")
         print(f"MAIL_DEFAULT_SENDER: {app.config['MAIL_DEFAULT_SENDER']}")
+        print(f"MAIL_PASSWORD está definido: {'Sim' if app.config['MAIL_PASSWORD'] else 'Não'}")
         
+        msg = Message(subject,
+                     sender=app.config['MAIL_DEFAULT_SENDER'],
+                     recipients=[user.email],
+                     html=html_body)
+        
+        print("\nTentando enviar email...")
         mail.send(msg)
         print("Email enviado com sucesso!")
+        print("=== FIM DO ENVIO DE EMAIL ===\n")
         return True
         
     except Exception as e:
-        print(f"Erro ao enviar email: {str(e)}")
+        print("\n=== ERRO AO ENVIAR EMAIL ===")
+        print(f"Tipo do erro: {type(e).__name__}")
+        print(f"Mensagem de erro: {str(e)}")
         if hasattr(e, 'stderr'):
             print(f"Erro detalhado: {e.stderr}")
+        print("=== FIM DO ERRO ===\n")
         return False
 
 # Rotas

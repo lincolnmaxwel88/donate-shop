@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import func, or_, and_
 from functools import wraps
 import os
@@ -16,6 +16,8 @@ import stripe
 from flask_mail import Mail, Message
 from config import Config
 from sqlalchemy import text
+import re
+import secrets
 
 # Configuração do Stripe
 stripe.api_key = 'sk_test_51QbVcLKxtlwVKoGi0AuzhFm6FmgCDnwZPmMZMCKYuBmex3wb4N9yIcOTubCJb9GGpF37zBnX1YZqeo7fd68GGyHX00j2yH2KeX'
@@ -28,6 +30,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///don
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
+
+# Configurar Flask-Mail
+mail = Mail(app)
 
 # Cria a pasta de uploads se não existir
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -42,9 +47,6 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Configuração do email
-mail = Mail(app)
-
 # Modelos
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -53,6 +55,8 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256))
     is_admin = db.Column(db.Boolean, default=False)
     is_blocked = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=False)  # Novo campo
+    activation_token = db.Column(db.String(100), unique=True)  # Token para ativação
     created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
     profile_image = db.Column(db.String(100))
     pix_key = db.Column(db.String(100), nullable=True)
@@ -245,6 +249,48 @@ def get_waiting_time_for_withdrawal(campaign):
             return int(next_withdrawal_minutes - (time_since_reject.total_seconds() / 60))
     
     return None
+
+def send_activation_email(user):
+    try:
+        print(f"Iniciando envio de email para {user.email}...")
+        
+        token = secrets.token_urlsafe(32)
+        user.activation_token = token
+        db.session.commit()
+        
+        activation_url = url_for('activate_account', token=token, _external=True)
+        print(f"URL de ativação gerada: {activation_url}")
+        
+        subject = 'Ative sua conta no Doar Sonhos'
+        html_body = f'''
+        <p>Olá {user.username},</p>
+        <p>Bem-vindo ao Doar Sonhos! Para ativar sua conta, clique no link abaixo:</p>
+        <p><a href="{activation_url}">Ativar minha conta</a></p>
+        <p>Se você não se cadastrou no Doar Sonhos, ignore este email.</p>
+        <p>Atenciosamente,<br>Equipe Doar Sonhos</p>
+        '''
+        
+        msg = Message(subject,
+                     sender=app.config['MAIL_DEFAULT_SENDER'],
+                     recipients=[user.email],
+                     html=html_body)
+        
+        print("Configurações de email:")
+        print(f"MAIL_SERVER: {app.config['MAIL_SERVER']}")
+        print(f"MAIL_PORT: {app.config['MAIL_PORT']}")
+        print(f"MAIL_USE_TLS: {app.config['MAIL_USE_TLS']}")
+        print(f"MAIL_USERNAME: {app.config['MAIL_USERNAME']}")
+        print(f"MAIL_DEFAULT_SENDER: {app.config['MAIL_DEFAULT_SENDER']}")
+        
+        mail.send(msg)
+        print("Email enviado com sucesso!")
+        return True
+        
+    except Exception as e:
+        print(f"Erro ao enviar email: {str(e)}")
+        if hasattr(e, 'stderr'):
+            print(f"Erro detalhado: {e.stderr}")
+        return False
 
 # Rotas
 @app.route('/')
@@ -488,30 +534,78 @@ def toggle_block(user_id):
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
         
+        # Validar campos obrigatórios
+        if not username or not email or not password or not confirm_password:
+            flash('Todos os campos são obrigatórios', 'error')
+            return redirect(url_for('register'))
+            
+        # Validar formato do email
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, email):
+            flash('Por favor, insira um email válido', 'error')
+            return redirect(url_for('register'))
+            
+        # Validar se as senhas coincidem
+        if password != confirm_password:
+            flash('As senhas não coincidem', 'error')
+            return redirect(url_for('register'))
+        
+        # Verificar se usuário já existe
         user = User.query.filter_by(username=username).first()
         if user:
             flash('Nome de usuário já existe', 'error')
             return redirect(url_for('register'))
             
+        # Verificar se email já está em uso
         user = User.query.filter_by(email=email).first()
         if user:
             flash('Email já está em uso', 'error')
             return redirect(url_for('register'))
             
+        # Criar novo usuário
         new_user = User(username=username, email=email)
         new_user.password_hash = generate_password_hash(password)
         
-        db.session.add(new_user)
-        db.session.commit()
-        
-        flash('Cadastro realizado com sucesso!', 'success')
-        return redirect(url_for('login'))
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+            
+            # Enviar email de ativação
+            if send_activation_email(new_user):
+                flash('Cadastro realizado com sucesso! Verifique seu email para ativar sua conta.', 'success')
+            else:
+                flash('Cadastro realizado, mas houve um erro ao enviar o email de ativação. Entre em contato com o suporte.', 'warning')
+            
+            return redirect(url_for('login'))
+        except Exception as e:
+            print(f"Erro ao criar usuário: {str(e)}")
+            db.session.rollback()
+            flash('Erro ao criar usuário. Por favor, tente novamente.', 'error')
+            return redirect(url_for('register'))
     
     return render_template('register.html')
+
+@app.route('/activate/<token>')
+def activate_account(token):
+    user = User.query.filter_by(activation_token=token).first()
+    
+    if user:
+        if user.is_active:
+            flash('Esta conta já está ativa!', 'info')
+        else:
+            user.is_active = True
+            user.activation_token = None  # Invalidar o token após uso
+            db.session.commit()
+            flash('Sua conta foi ativada com sucesso! Agora você pode fazer login.', 'success')
+    else:
+        flash('Link de ativação inválido!', 'error')
+    
+    return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -521,17 +615,23 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        
         user = User.query.filter_by(username=username).first()
         
         if user and check_password_hash(user.password_hash, password):
             if user.is_blocked:
-                flash('Sua conta está bloqueada. Entre em contato com o administrador.', 'error')
+                flash('Sua conta está bloqueada. Entre em contato com o suporte.', 'error')
+                return redirect(url_for('login'))
+                
+            if not user.is_active:
+                flash('Sua conta ainda não foi ativada. Verifique seu email para ativar.', 'warning')
                 return redirect(url_for('login'))
             
             login_user(user)
+            flash('Login realizado com sucesso!', 'success')
             return redirect(url_for('index'))
-            
-        flash('Usuário ou senha inválidos', 'error')
+        else:
+            flash('Usuário ou senha inválidos', 'error')
     
     return render_template('login.html', current_year=datetime.now().year)
 

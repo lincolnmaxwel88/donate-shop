@@ -3,7 +3,7 @@ from datetime import timedelta
 
 class Config:
     # Configurações básicas
-    SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
+    SECRET_KEY = os.getenv('SECRET_KEY', 'b215813213bb78fcfe04e62a84b98dc97be63365a0536dd37b979ceccea195da')
     CONTACT_EMAIL = 'contato@doarsonhos.com.br'  # Email que receberá as mensagens de contato
     
     # Configurações do banco de dados
@@ -16,14 +16,14 @@ class Config:
     # Chave secreta para sessões
     PERMANENT_SESSION_LIFETIME = timedelta(days=31)
     
-    # Configurações de upload
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max-limit
-    
-    # Configurações do Flask-Mail
+    # Configurações de email
     MAIL_SERVER = 'smtp.zoho.com'
     MAIL_PORT = 587
     MAIL_USE_TLS = True
-    MAIL_USERNAME = 'contato@doarsonhos.com.br'
-    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', 'Linday#1818')  # Coloque a senha no Railway
-    MAIL_DEFAULT_SENDER = ('Doar Sonhos', 'contato@doarsonhos.com.br')  # Email que aparecerá como remetente
+    MAIL_USERNAME = 'no-reply@doarsonhos.com.br'
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', 'Linday#1818')  # Definir no Railway
+    MAIL_DEFAULT_SENDER = ('Doar Sonhos', 'no-reply@doarsonhos.com.br')
+    
+    # Configurações de upload
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max-limit

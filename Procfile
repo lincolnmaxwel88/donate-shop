@@ -1,1 +1,1 @@
-web: python migrations/railway_migrate.py && gunicorn app:app
+web: bash init_railway.sh

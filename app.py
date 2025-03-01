@@ -262,13 +262,90 @@ def send_activation_email(user):
         activation_url = url_for('activate_account', token=token, _external=True)
         print(f"URL de ativação: {activation_url}")
         
-        subject = 'Ative sua conta no Doar Sonhos'
+        subject = 'Bem-vindo ao Doar Sonhos - Ative sua conta'
         html_body = f'''
-        <p>Olá {user.username},</p>
-        <p>Bem-vindo ao Doar Sonhos! Para ativar sua conta, clique no link abaixo:</p>
-        <p><a href="{activation_url}">Ativar minha conta</a></p>
-        <p>Se você não se cadastrou no Doar Sonhos, ignore este email.</p>
-        <p>Atenciosamente,<br>Equipe Doar Sonhos</p>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333333;
+                    margin: 0;
+                    padding: 0;
+                }}
+                .container {{
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }}
+                .header {{
+                    background-color: #4CAF50;
+                    color: white;
+                    text-align: center;
+                    padding: 20px;
+                    border-radius: 5px 5px 0 0;
+                }}
+                .content {{
+                    background-color: #ffffff;
+                    padding: 20px;
+                    border: 1px solid #dddddd;
+                    border-radius: 0 0 5px 5px;
+                }}
+                .button {{
+                    display: inline-block;
+                    padding: 12px 24px;
+                    background-color: #4CAF50;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                }}
+                .footer {{
+                    text-align: center;
+                    margin-top: 20px;
+                    color: #666666;
+                    font-size: 12px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Bem-vindo ao Doar Sonhos!</h1>
+                </div>
+                <div class="content">
+                    <h2>Olá {user.username},</h2>
+                    <p>Estamos muito felizes em ter você conosco! Para começar a usar sua conta e fazer parte desta incrível comunidade de doadores, por favor ative sua conta clicando no botão abaixo:</p>
+                    
+                    <div style="text-align: center;">
+                        <a href="{activation_url}" class="button">Ativar minha conta</a>
+                    </div>
+                    
+                    <p>Se o botão não funcionar, você também pode copiar e colar o seguinte link no seu navegador:</p>
+                    <p style="word-break: break-all; font-size: 12px; color: #666666;">
+                        {activation_url}
+                    </p>
+                    
+                    <p><strong>Por que ativar sua conta?</strong></p>
+                    <ul>
+                        <li>Garantir a segurança da sua conta</li>
+                        <li>Acessar todas as funcionalidades da plataforma</li>
+                        <li>Começar a fazer doações e ajudar quem precisa</li>
+                    </ul>
+                    
+                    <p>Se você não se cadastrou no Doar Sonhos, pode ignorar este email.</p>
+                </div>
+                <div class="footer">
+                    <p>Este é um email automático, por favor não responda.</p>
+                    <p>&copy; 2025 Doar Sonhos. Todos os direitos reservados.</p>
+                </div>
+            </div>
+        </body>
+        </html>
         '''
         
         print("\nConfigurações de email:")

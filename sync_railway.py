@@ -25,6 +25,24 @@ def wait_for_db(app, max_retries=30):
                 raise
     return None
 
+def check_table_exists(db, table_name):
+    """Verifica se uma tabela existe"""
+    inspector = inspect(db.engine)
+    if table_name not in inspector.get_table_names():
+        print(f"ERRO: Tabela {table_name} não existe!")
+        return False
+    print(f"OK: Tabela {table_name} existe")
+    return True
+
+def check_table_columns(db, table_name):
+    """Verifica todas as colunas de uma tabela"""
+    inspector = inspect(db.engine)
+    columns = inspector.get_columns(table_name)
+    print(f"\nColunas da tabela {table_name}:")
+    for col in columns:
+        print(f"- {col['name']}: {col['type']} (nullable: {col['nullable']})")
+    return columns
+
 def ensure_column_exists(db, table_name, column_name, column_type, default=None):
     """Garante que uma coluna existe na tabela"""
     inspector = inspect(db.engine)
@@ -35,11 +53,16 @@ def ensure_column_exists(db, table_name, column_name, column_type, default=None)
         alter_stmt = f'ALTER TABLE "{table_name}" ADD COLUMN IF NOT EXISTS {column_name} {column_type}'
         if default is not None:
             alter_stmt += f" DEFAULT {default}"
-        db.session.execute(text(alter_stmt))
-        db.session.commit()
-        print(f"Coluna {column_name} adicionada com sucesso!")
+        try:
+            db.session.execute(text(alter_stmt))
+            db.session.commit()
+            print(f"Coluna {column_name} adicionada com sucesso!")
+        except Exception as e:
+            print(f"ERRO ao adicionar coluna {column_name}: {str(e)}")
+            return False
     else:
         print(f"Coluna {column_name} já existe na tabela {table_name}")
+    return True
 
 def ensure_index_exists(db, table_name, index_name, column_name, unique=False):
     """Garante que um índice existe na tabela"""
@@ -50,13 +73,32 @@ def ensure_index_exists(db, table_name, index_name, column_name, unique=False):
     if not index_exists:
         print(f"Criando índice {index_name} na tabela {table_name}...")
         unique_str = "UNIQUE" if unique else ""
-        db.session.execute(text(
-            f'CREATE {unique_str} INDEX IF NOT EXISTS {index_name} ON "{table_name}" ({column_name})'
-        ))
-        db.session.commit()
-        print(f"Índice {index_name} criado com sucesso!")
+        try:
+            db.session.execute(text(
+                f'CREATE {unique_str} INDEX IF NOT EXISTS {index_name} ON "{table_name}" ({column_name})'
+            ))
+            db.session.commit()
+            print(f"Índice {index_name} criado com sucesso!")
+        except Exception as e:
+            print(f"ERRO ao criar índice {index_name}: {str(e)}")
+            return False
     else:
         print(f"Índice {index_name} já existe na tabela {table_name}")
+    return True
+
+def show_table_data(db, table_name):
+    """Mostra os primeiros registros de uma tabela"""
+    try:
+        result = db.session.execute(text(f'SELECT * FROM "{table_name}" LIMIT 5'))
+        rows = result.fetchall()
+        if rows:
+            print(f"\nPrimeiros registros da tabela {table_name}:")
+            for row in rows:
+                print(row)
+        else:
+            print(f"\nTabela {table_name} está vazia")
+    except Exception as e:
+        print(f"ERRO ao consultar tabela {table_name}: {str(e)}")
 
 def sync_database():
     """Sincroniza o esquema do banco de dados"""
@@ -66,12 +108,25 @@ def sync_database():
         
         print("\nVerificando estrutura do banco de dados...")
         
+        # Verificar se a tabela existe
+        if not check_table_exists(db, "user"):
+            return False
+            
+        # Mostrar todas as colunas atuais
+        check_table_columns(db, "user")
+        
         # Garantir que as colunas de ativação existem
-        ensure_column_exists(db, "user", "is_active", "BOOLEAN", "false")
-        ensure_column_exists(db, "user", "activation_token", "TEXT")
+        if not ensure_column_exists(db, "user", "is_active", "BOOLEAN", "false"):
+            return False
+        if not ensure_column_exists(db, "user", "activation_token", "TEXT"):
+            return False
         
         # Garantir que o índice único existe
-        ensure_index_exists(db, "user", "idx_user_activation_token", "activation_token", unique=True)
+        if not ensure_index_exists(db, "user", "idx_user_activation_token", "activation_token", unique=True):
+            return False
+            
+        # Verificar dados
+        show_table_data(db, "user")
         
         print("\nBanco de dados sincronizado com sucesso!")
         return True
@@ -97,11 +152,17 @@ def verify_env_vars():
     missing_vars = []
     
     for var in required_vars:
-        if not os.getenv(var):
+        value = os.getenv(var)
+        if not value:
             missing_vars.append(var)
             print(f"ERRO: Variável {var} não está definida!")
         else:
-            print(f"OK: Variável {var} está definida")
+            # Mostrar parte da senha para debug
+            if var == 'MAIL_PASSWORD':
+                masked_value = value[:3] + '*' * (len(value) - 3)
+                print(f"OK: Variável {var} está definida como: {masked_value}")
+            else:
+                print(f"OK: Variável {var} está definida como: {value}")
     
     if missing_vars:
         print("\nATENÇÃO: As seguintes variáveis precisam ser configuradas:")
